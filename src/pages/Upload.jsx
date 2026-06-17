@@ -58,7 +58,10 @@ export default function Upload({ session }) {
         body: JSON.stringify({ report_id: report.id, pdf_path: filePath }),
       })
 
-      if (!res.ok) throw new Error('Erreur extraction')
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error || `Erreur extraction (HTTP ${res.status})`)
+      }
 
       // 4. Rediriger vers la page de validation
       navigate(`/reports/${report.id}`)
