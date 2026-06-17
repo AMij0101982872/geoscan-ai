@@ -92,44 +92,31 @@ export default async function handler(req, res) {
     const buffer = await fileData.arrayBuffer()
     const base64 = Buffer.from(buffer).toString('base64')
 
-    // 3. Appeler Claude API
-    const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 2000,
-        messages: [{
-          role: 'user',
-          content: [
-            {
-              type: 'document',
-              source: {
-                type: 'base64',
-                media_type: 'application/pdf',
-                data: base64,
-              },
-            },
-            {
-              type: 'text',
-              text: CLAUDE_PROMPT,
-            },
-          ],
-        }],
-      }),
-    })
+    // 3. Appeler Gemini API
+    const geminiRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { inline_data: { mime_type: 'application/pdf', data: base64 } },
+              { text: CLAUDE_PROMPT },
+            ],
+          }],
+          generationConfig: { temperature: 0.1 },
+        }),
+      }
+    )
 
-    if (!claudeRes.ok) {
-      const err = await claudeRes.text()
-      throw new Error(`Claude API error: ${err}`)
+    if (!geminiRes.ok) {
+      const err = await geminiRes.text()
+      throw new Error(`Gemini API error: ${err}`)
     }
 
-    const claude = await claudeRes.json()
-    const rawText = claude.content[0].text.replace(/```json|```/g, '').trim()
+    const gemini = await geminiRes.json()
+    const rawText = gemini.candidates[0].content.parts[0].text.replace(/```json|```/g, '').trim()
     const raw_json = JSON.parse(rawText)
 
     // 4. Sauvegarder les données extraites
