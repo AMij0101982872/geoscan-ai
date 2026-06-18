@@ -17,8 +17,8 @@ function EditableCell({ value, onSave, fieldPath, highlight = false }) {
         onChange={e => setVal(e.target.value)}
         onBlur={handleSave}
         onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') setEditing(false) }}
-        className="w-full rounded-lg px-2 py-1 text-sm font-medium focus:outline-none text-center text-white"
-        style={{ background: 'rgba(255,255,255,0.08)', border: '2px solid #4f6ef7', boxShadow: '0 0 0 3px rgba(79,110,247,0.15)' }}
+        className="w-full border-2 border-brand-500 rounded-lg px-2 py-1 text-sm font-medium focus:outline-none bg-white shadow-sm text-center"
+        style={{ boxShadow: '0 0 0 3px rgba(79,110,247,0.12)' }}
       />
     )
   }
@@ -27,18 +27,12 @@ function EditableCell({ value, onSave, fieldPath, highlight = false }) {
     <span
       onClick={() => setEditing(true)}
       title="Cliquer pour modifier"
-      className="group/cell relative cursor-pointer inline-flex items-center justify-center gap-1.5 px-2 py-1 rounded-lg w-full transition-all"
-      style={{
-        color: highlight ? '#ffffff' : 'rgba(255,255,255,0.75)',
-        fontWeight: highlight ? 600 : 400,
-      }}
-      onMouseEnter={e => { if (!highlight) e.currentTarget.style.background = 'rgba(255,255,255,0.07)' }}
-      onMouseLeave={e => { if (!highlight) e.currentTarget.style.background = 'transparent' }}
+      className={`group/cell relative cursor-pointer inline-flex items-center justify-center gap-1.5 px-2 py-1 rounded-lg w-full transition-all
+        ${highlight ? 'font-semibold text-white' : 'text-gray-700 hover:bg-white hover:shadow-sm'}`}
     >
-      {value ?? <span style={{ color: 'rgba(255,255,255,0.18)', fontStyle: 'italic', fontSize: '0.75rem' }}>—</span>}
+      {value ?? <span className="text-gray-300 italic text-xs">—</span>}
       <svg
-        className="w-3 h-3 flex-shrink-0 opacity-0 group-hover/cell:opacity-50 transition-opacity"
-        style={{ color: highlight ? '#fff' : '#818cf8' }}
+        className={`w-3 h-3 flex-shrink-0 opacity-0 group-hover/cell:opacity-60 transition-opacity ${highlight ? 'text-white' : 'text-slate-400'}`}
         fill="none" stroke="currentColor" viewBox="0 0 24 24"
       >
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -48,11 +42,8 @@ function EditableCell({ value, onSave, fieldPath, highlight = false }) {
   )
 }
 
-const SECTION_HEADER = { background: 'linear-gradient(135deg, #1a2545 0%, #1e3a7a 100%)' }
-const COL_HEADER = { background: 'rgba(30,58,122,0.8)' }
-const ROW_EVEN = { background: 'rgba(255,255,255,0.02)' }
-const ROW_ODD = { background: 'rgba(255,255,255,0.04)' }
-const ROW_BORDER = { borderBottom: '1px solid rgba(255,255,255,0.05)' }
+const SECTION_HEADER = { background: 'linear-gradient(135deg, #1e2d5c 0%, #2f5496 100%)' }
+const COL_HEADER = { background: '#2f5496' }
 
 export function SectionATable({ data, onSave }) {
   const tares = data?.tares || []
@@ -76,9 +67,9 @@ export function SectionATable({ data, onSave }) {
             </th>
           </tr>
           <tr style={COL_HEADER}>
-            <th className="text-left px-5 py-2.5 text-xs font-semibold w-72" style={{ color: 'rgba(165,180,252,0.8)' }}>Paramètre</th>
+            <th className="text-left px-5 py-2.5 text-xs font-semibold text-blue-100 w-72">Paramètre</th>
             {tares.map((t, i) => (
-              <th key={i} className="text-center px-4 py-2.5 text-xs font-semibold" style={{ color: 'rgba(165,180,252,0.8)' }}>
+              <th key={i} className="text-center px-4 py-2.5 text-xs font-semibold text-blue-100">
                 {t.id ? `Tare — ${t.id}` : `Tare ${i + 1}`}
               </th>
             ))}
@@ -86,11 +77,9 @@ export function SectionATable({ data, onSave }) {
         </thead>
         <tbody>
           {rows.map((row, ri) => (
-            <tr key={row.key} className="transition-colors"
-              style={{ ...(ri % 2 === 0 ? ROW_EVEN : ROW_ODD), ...ROW_BORDER }}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(79,110,247,0.07)'}
-              onMouseLeave={e => e.currentTarget.style.background = ri % 2 === 0 ? ROW_EVEN.background : ROW_ODD.background}>
-              <td className="px-5 py-3 font-medium text-sm" style={{ color: 'rgba(255,255,255,0.65)' }}>{row.label}</td>
+            <tr key={row.key}
+              className={`border-b border-gray-100 transition-colors hover:bg-blue-50/30 ${ri % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
+              <td className="px-5 py-3 text-gray-700 font-medium text-sm">{row.label}</td>
               {tares.map((t, i) => (
                 <td key={i} className="px-4 py-3 text-center">
                   <EditableCell value={t[row.key]} fieldPath={`section_a.tares[${i}].${row.key}`} onSave={onSave} />
@@ -98,14 +87,13 @@ export function SectionATable({ data, onSave }) {
               ))}
             </tr>
           ))}
-          {/* Orange accent rows */}
           {[
             { label: 'Masse éprouvette non séchée (g)', key: 'masse_eprouvette', path: 'section_a.masse_eprouvette' },
             { label: 'Masse retenue sur tamis 0,400 (g)', key: 'masse_retenue_tamis', path: 'section_a.masse_retenue_tamis' },
           ].map(row => (
-            <tr key={row.key} style={{ borderBottom: '1px solid rgba(251,146,60,0.15)' }}>
-              <td className="px-5 py-3 font-semibold text-sm" style={{ background: 'rgba(251,146,60,0.08)', color: '#fb923c' }}>{row.label}</td>
-              <td className="px-4 py-3 text-center" style={{ background: 'rgba(251,146,60,0.05)' }} colSpan={tares.length}>
+            <tr key={row.key} className="border-b border-orange-100">
+              <td className="px-5 py-3 font-semibold text-orange-800 text-sm bg-orange-50">{row.label}</td>
+              <td className="px-4 py-3 text-center bg-orange-50" colSpan={tares.length}>
                 <EditableCell value={data?.[row.key]} fieldPath={row.path} onSave={onSave} />
               </td>
             </tr>
@@ -139,21 +127,17 @@ export function SectionB1Table({ data, onSave }) {
             </th>
           </tr>
           <tr style={COL_HEADER}>
-            <th className="text-left px-5 py-2.5 text-xs font-semibold w-72" style={{ color: 'rgba(165,180,252,0.8)' }}>Paramètre</th>
+            <th className="text-left px-5 py-2.5 text-xs font-semibold text-blue-100 w-72">Paramètre</th>
             {mesures.map((_, i) => (
-              <th key={i} className="text-center px-4 py-2.5 text-xs font-semibold" style={{ color: 'rgba(165,180,252,0.8)' }}>
-                Col. {i + 1}
-              </th>
+              <th key={i} className="text-center px-4 py-2.5 text-xs font-semibold text-blue-100">Col. {i + 1}</th>
             ))}
           </tr>
         </thead>
         <tbody>
           {rows.map((row, ri) => (
-            <tr key={row.key} className="transition-colors"
-              style={{ ...(ri % 2 === 0 ? ROW_EVEN : ROW_ODD), ...ROW_BORDER }}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(79,110,247,0.07)'}
-              onMouseLeave={e => e.currentTarget.style.background = ri % 2 === 0 ? ROW_EVEN.background : ROW_ODD.background}>
-              <td className="px-5 py-3 font-medium text-sm" style={{ color: 'rgba(255,255,255,0.65)' }}>{row.label}</td>
+            <tr key={row.key}
+              className={`border-b border-gray-100 transition-colors hover:bg-blue-50/30 ${ri % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
+              <td className="px-5 py-3 text-gray-700 font-medium text-sm">{row.label}</td>
               {mesures.map((m, i) => (
                 <td key={i} className="px-4 py-3 text-center">
                   <EditableCell value={m[row.key]} fieldPath={`section_b1.mesures[${i}].${row.key}`} onSave={onSave} />
@@ -161,8 +145,7 @@ export function SectionB1Table({ data, onSave }) {
               ))}
             </tr>
           ))}
-          {/* Teneur en eau — blue highlight row */}
-          <tr style={{ background: 'linear-gradient(135deg, #1a2545 0%, #1e3a7a 100%)' }}>
+          <tr style={{ background: '#2f5496' }}>
             <td className="px-5 py-3 font-semibold text-white text-sm">Teneur en eau mesurée (%)</td>
             {mesures.map((m, i) => (
               <td key={i} className="px-4 py-3 text-center">
@@ -199,21 +182,17 @@ export function SectionB2Table({ data, onSave }) {
             </th>
           </tr>
           <tr style={COL_HEADER}>
-            <th className="text-left px-5 py-2.5 text-xs font-semibold w-72" style={{ color: 'rgba(165,180,252,0.8)' }}>Paramètre</th>
+            <th className="text-left px-5 py-2.5 text-xs font-semibold text-blue-100 w-72">Paramètre</th>
             {mesures.map((_, i) => (
-              <th key={i} className="text-center px-4 py-2.5 text-xs font-semibold" style={{ color: 'rgba(165,180,252,0.8)' }}>
-                Tare {i + 1}
-              </th>
+              <th key={i} className="text-center px-4 py-2.5 text-xs font-semibold text-blue-100">Tare {i + 1}</th>
             ))}
           </tr>
         </thead>
         <tbody>
           {rows.map((row, ri) => (
-            <tr key={row.key} className="transition-colors"
-              style={{ ...(ri % 2 === 0 ? ROW_EVEN : ROW_ODD), ...ROW_BORDER }}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(79,110,247,0.07)'}
-              onMouseLeave={e => e.currentTarget.style.background = ri % 2 === 0 ? ROW_EVEN.background : ROW_ODD.background}>
-              <td className="px-5 py-3 font-medium text-sm" style={{ color: 'rgba(255,255,255,0.65)' }}>{row.label}</td>
+            <tr key={row.key}
+              className={`border-b border-gray-100 transition-colors hover:bg-blue-50/30 ${ri % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
+              <td className="px-5 py-3 text-gray-700 font-medium text-sm">{row.label}</td>
               {mesures.map((m, i) => (
                 <td key={i} className="px-4 py-3 text-center">
                   <EditableCell value={m[row.key]} fieldPath={`section_b2.mesures[${i}].${row.key}`} onSave={onSave} />
@@ -221,8 +200,7 @@ export function SectionB2Table({ data, onSave }) {
               ))}
             </tr>
           ))}
-          {/* Teneur en eau Moyenne — blue highlight row */}
-          <tr style={{ background: 'linear-gradient(135deg, #1a2545 0%, #1e3a7a 100%)' }}>
+          <tr style={{ background: '#2f5496' }}>
             <td className="px-5 py-3 font-semibold text-white text-sm">Teneur en eau Moyenne (%)</td>
             <td className="px-4 py-3 text-center font-semibold" colSpan={mesures.length}>
               <EditableCell value={data?.teneur_eau_moyenne} fieldPath="section_b2.teneur_eau_moyenne" onSave={onSave} highlight />

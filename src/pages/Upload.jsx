@@ -8,7 +8,7 @@ const STEPS = [
     title: 'Upload PDF',
     desc: 'Importez votre procès-verbal manuscrit',
     color: '#4f6ef7',
-    bg: 'rgba(79,110,247,0.12)',
+    bg: 'rgba(79,110,247,0.08)',
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -21,7 +21,7 @@ const STEPS = [
     title: 'Extraction IA',
     desc: "L'IA lit et structure les données automatiquement",
     color: '#818cf8',
-    bg: 'rgba(129,140,248,0.12)',
+    bg: 'rgba(129,140,248,0.08)',
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -33,8 +33,8 @@ const STEPS = [
     n: '03',
     title: 'Validation',
     desc: 'Corrigez et exportez en Excel',
-    color: '#4ade80',
-    bg: 'rgba(74,222,128,0.12)',
+    color: '#22c55e',
+    bg: 'rgba(34,197,94,0.08)',
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -45,9 +45,10 @@ const STEPS = [
 ]
 
 const CARD = {
-  background: '#111827',
-  border: '1px solid rgba(255,255,255,0.06)',
+  background: '#ffffff',
+  border: '1px solid #eef0f5',
   borderRadius: '16px',
+  boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.03)',
 }
 
 export default function Upload({ session }) {
@@ -103,24 +104,18 @@ export default function Upload({ session }) {
   }
 
   return (
-    <div className="min-h-full p-6" style={{ background: '#0c1220' }}>
+    <div className="min-h-full p-6" style={{ background: '#f5f7fb' }}>
       <div className="max-w-2xl mx-auto">
 
         {/* Header */}
         <div className="flex items-center justify-between mb-7">
           <div>
-            <h1 className="text-lg font-bold text-white tracking-tight">Nouveau rapport</h1>
-            <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.3)' }}>
-              Importez un procès-verbal Atterberg manuscrit au format PDF
-            </p>
+            <h1 className="text-lg font-bold text-gray-900 tracking-tight">Nouveau rapport</h1>
+            <p className="text-xs text-slate-400 mt-0.5">Importez un procès-verbal Atterberg manuscrit au format PDF</p>
           </div>
           <button
             onClick={() => navigate('/')}
-            className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl transition-all"
-            style={{ color: 'rgba(255,255,255,0.35)', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
-            onMouseEnter={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.7)'; e.currentTarget.style.background = 'rgba(255,255,255,0.08)' }}
-            onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.35)'; e.currentTarget.style.background = 'rgba(255,255,255,0.04)' }}
-          >
+            className="flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 px-3 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 transition-all">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
@@ -139,12 +134,8 @@ export default function Upload({ session }) {
             onClick={() => !uploading && !file && inputRef.current.click()}
             className="m-5 rounded-xl border-2 border-dashed transition-all duration-200"
             style={{
-              borderColor: dragging ? '#4f6ef7' : file ? '#4ade80' : 'rgba(255,255,255,0.1)',
-              background: dragging
-                ? 'rgba(79,110,247,0.08)'
-                : file
-                ? 'rgba(74,222,128,0.06)'
-                : 'rgba(255,255,255,0.02)',
+              borderColor: dragging ? '#4f6ef7' : file ? '#22c55e' : '#e2e8f0',
+              background: dragging ? 'rgba(79,110,247,0.04)' : file ? 'rgba(34,197,94,0.03)' : '#fafbff',
               cursor: file || uploading ? 'default' : 'pointer',
             }}
           >
@@ -153,49 +144,40 @@ export default function Upload({ session }) {
             <div className="py-14 px-8 flex flex-col items-center text-center">
               {file ? (
                 <>
-                  <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
-                    style={{ background: 'rgba(74,222,128,0.12)' }}>
-                    <svg className="w-8 h-8" style={{ color: '#4ade80' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4 bg-green-50">
+                    <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                         d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                     </svg>
                   </div>
-                  <p className="font-semibold text-white text-base mb-1">{file.name}</p>
-                  <p className="text-sm mb-5" style={{ color: 'rgba(255,255,255,0.35)' }}>
-                    {(file.size / 1024).toFixed(0)} Ko · PDF
-                  </p>
+                  <p className="font-semibold text-gray-900 text-base mb-1">{file.name}</p>
+                  <p className="text-sm text-slate-400 mb-4">{(file.size / 1024).toFixed(0)} Ko · PDF</p>
                   <button
                     onClick={e => { e.stopPropagation(); setFile(null) }}
-                    className="text-xs font-medium px-3 py-1.5 rounded-lg transition-all"
-                    style={{ color: '#f87171', background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.2)' }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(248,113,113,0.18)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'rgba(248,113,113,0.1)'}
-                  >
+                    className="text-xs font-medium px-3 py-1.5 rounded-lg text-red-400 hover:text-red-600 border border-red-100 hover:border-red-300 hover:bg-red-50 transition-all">
                     Changer de fichier
                   </button>
                 </>
               ) : (
                 <>
                   <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5 transition-colors"
-                    style={{ background: dragging ? 'rgba(79,110,247,0.2)' : 'rgba(255,255,255,0.06)' }}>
+                    style={{ background: dragging ? 'rgba(79,110,247,0.1)' : '#f1f5f9' }}>
                     <svg className="w-8 h-8 transition-colors"
-                      style={{ color: dragging ? '#818cf8' : 'rgba(255,255,255,0.25)' }}
+                      style={{ color: dragging ? '#4f6ef7' : '#94a3b8' }}
                       fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                         d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                     </svg>
                   </div>
-                  <p className="font-semibold text-white text-base">
+                  <p className="font-semibold text-gray-800 text-base">
                     {dragging ? 'Relâchez pour importer' : 'Glisser-déposer votre PDF'}
                   </p>
-                  <p className="text-sm mt-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>
-                    ou{' '}
-                    <span style={{ color: '#818cf8', fontWeight: 600 }}>cliquez pour parcourir</span>
+                  <p className="text-sm text-slate-400 mt-1.5">
+                    ou <span className="text-brand-600 font-semibold hover:text-brand-700 transition-colors">cliquez pour parcourir</span>
                   </p>
                   <div className="mt-5 flex items-center gap-2">
                     {['PDF uniquement', 'Max 10 Mo'].map(label => (
-                      <span key={label} className="inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded-full"
-                        style={{ color: 'rgba(255,255,255,0.25)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                      <span key={label} className="inline-flex items-center gap-1.5 text-xs text-slate-300 px-3 py-1 rounded-full border border-slate-100">
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4" />
                         </svg>
@@ -210,8 +192,7 @@ export default function Upload({ session }) {
 
           {/* Error */}
           {error && (
-            <div className="mx-5 mb-5 flex items-start gap-2.5 text-sm px-4 py-3 rounded-xl"
-              style={{ background: 'rgba(248,113,113,0.1)', color: '#f87171', border: '1px solid rgba(248,113,113,0.2)' }}>
+            <div className="mx-5 mb-5 flex items-start gap-2.5 bg-red-50 text-red-700 text-sm px-4 py-3 rounded-xl border border-red-100">
               <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                   d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -222,11 +203,7 @@ export default function Upload({ session }) {
 
           {/* Actions */}
           <div className="px-5 pb-5 flex items-center gap-3">
-            <button
-              onClick={handleUpload}
-              disabled={!file || uploading}
-              className="flex-1 btn-primary py-3 text-base"
-            >
+            <button onClick={handleUpload} disabled={!file || uploading} className="flex-1 btn-primary py-3 text-base">
               {uploading ? (
                 <>
                   <span className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" />
@@ -235,18 +212,13 @@ export default function Upload({ session }) {
               ) : (
                 <>
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                      d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                   </svg>
                   Lancer l'extraction
                 </>
               )}
             </button>
-            <button onClick={() => navigate('/')}
-              className="py-3 px-5 rounded-xl text-sm font-medium transition-all"
-              style={{ color: 'rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.09)'; e.currentTarget.style.color = 'rgba(255,255,255,0.7)' }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = 'rgba(255,255,255,0.4)' }}>
+            <button onClick={() => navigate('/')} className="btn-secondary py-3 px-5">
               Annuler
             </button>
           </div>
@@ -257,14 +229,13 @@ export default function Upload({ session }) {
           {STEPS.map(step => (
             <div key={step.n} className="p-4" style={CARD}>
               <div className="flex items-center gap-2 mb-3">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center"
-                  style={{ background: step.bg, color: step.color }}>
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: step.bg, color: step.color }}>
                   {step.icon}
                 </div>
-                <span className="text-xs font-bold" style={{ color: 'rgba(255,255,255,0.18)' }}>{step.n}</span>
+                <span className="text-xs font-bold text-slate-300">{step.n}</span>
               </div>
-              <p className="text-sm font-semibold text-white">{step.title}</p>
-              <p className="text-xs mt-0.5 leading-relaxed" style={{ color: 'rgba(255,255,255,0.35)' }}>{step.desc}</p>
+              <p className="text-sm font-semibold text-gray-800">{step.title}</p>
+              <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">{step.desc}</p>
             </div>
           ))}
         </div>

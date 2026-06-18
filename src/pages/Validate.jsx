@@ -5,17 +5,18 @@ import { SectionATable, SectionB1Table, SectionB2Table } from '../components/Dat
 import ExportBtn from '../components/ExportBtn'
 
 const CARD = {
-  background: '#111827',
-  border: '1px solid rgba(255,255,255,0.06)',
+  background: '#ffffff',
+  border: '1px solid #eef0f5',
   borderRadius: '16px',
   overflow: 'hidden',
+  boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.03)',
 }
 
 function MetaField({ label, value }) {
   return (
-    <div className="p-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
-      <div className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: 'rgba(255,255,255,0.3)' }}>{label}</div>
-      <div className="text-sm font-semibold text-white">{value || <span style={{ color: 'rgba(255,255,255,0.2)', fontWeight: 400 }}>—</span>}</div>
+    <div className="p-4 border-b border-r border-gray-100">
+      <div className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">{label}</div>
+      <div className="text-sm font-semibold text-gray-900">{value || <span className="text-slate-300 font-normal">—</span>}</div>
     </div>
   )
 }
@@ -67,45 +68,38 @@ export default function Validate() {
   }
 
   if (loading) return (
-    <div className="min-h-full flex items-center justify-center" style={{ background: '#0c1220' }}>
+    <div className="min-h-full flex items-center justify-center" style={{ background: '#f5f7fb' }}>
       <span className="animate-spin rounded-full h-8 w-8 border-2 border-brand-500 border-t-transparent" />
     </div>
   )
   if (!report || !data) return (
-    <div className="min-h-full flex items-center justify-center" style={{ background: '#0c1220' }}>
-      <p className="text-sm" style={{ color: '#f87171' }}>Rapport introuvable.</p>
-    </div>
+    <div className="p-8 text-red-500 text-sm">Rapport introuvable.</div>
   )
 
   const meta = data.meta || {}
 
   return (
-    <div className="min-h-full" style={{ background: '#0c1220' }}>
+    <div className="min-h-full" style={{ background: '#f5f7fb' }}>
 
       {/* Sticky top bar */}
-      <div className="sticky top-0 z-10 backdrop-blur-md"
-        style={{ background: 'rgba(12,18,32,0.9)', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+      <div className="sticky top-0 z-10 bg-white/90 backdrop-blur-md border-b border-gray-100 shadow-sm">
         <div className="max-w-5xl mx-auto px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
               onClick={() => navigate('/')}
-              className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl transition-all"
-              style={{ color: 'rgba(255,255,255,0.35)', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
-              onMouseEnter={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.7)'; e.currentTarget.style.background = 'rgba(255,255,255,0.08)' }}
-              onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.35)'; e.currentTarget.style.background = 'rgba(255,255,255,0.04)' }}
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-700 transition-colors group">
+              <svg className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
               Retour
             </button>
-            <div className="w-px h-5" style={{ background: 'rgba(255,255,255,0.08)' }} />
+            <div className="w-px h-5 bg-gray-200" />
             <div>
-              <div className="text-sm font-semibold text-white leading-tight">{report.filename}</div>
-              <div className="flex items-center gap-2 text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.35)' }}>
+              <div className="text-sm font-semibold text-gray-900 leading-tight">{report.filename}</div>
+              <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
                 <span>{new Date(report.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
                 {report.validated && corrections.length === 0 && (
-                  <span className="inline-flex items-center gap-1 font-semibold" style={{ color: '#4ade80' }}>
+                  <span className="inline-flex items-center gap-1 text-green-600 font-semibold">
                     <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
@@ -113,8 +107,8 @@ export default function Validate() {
                   </span>
                 )}
                 {corrections.length > 0 && (
-                  <span className="inline-flex items-center gap-1 font-semibold" style={{ color: '#fbbf24' }}>
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                  <span className="inline-flex items-center gap-1 text-amber-500 font-semibold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
                     {corrections.length} correction(s) non sauvegardée(s)
                   </span>
                 )}
@@ -126,9 +120,8 @@ export default function Validate() {
             <button
               onClick={handleSave}
               disabled={saving}
-              className="btn-primary gap-2"
-              style={saved ? { background: 'linear-gradient(135deg, #16a34a, #15803d)' } : {}}
-            >
+              className={`btn-primary gap-2 ${saved ? 'bg-green-500 hover:bg-green-600' : ''}`}
+              style={saved ? { background: 'linear-gradient(135deg, #16a34a, #15803d)' } : {}}>
               {saving ? (
                 <>
                   <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
@@ -160,9 +153,10 @@ export default function Validate() {
 
         {/* Meta card */}
         <div style={CARD}>
-          <div className="px-5 py-4" style={{ background: 'linear-gradient(135deg, #1a2545 0%, #1e3a7a 100%)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <div className="px-5 py-4 border-b border-gray-100"
+            style={{ background: 'linear-gradient(135deg, #1e2d5c 0%, #2f5496 100%)' }}>
             <h2 className="text-sm font-bold text-white uppercase tracking-wider">Informations générales</h2>
-            <p className="text-xs mt-0.5" style={{ color: 'rgba(165,180,252,0.7)' }}>Métadonnées du procès-verbal</p>
+            <p className="text-xs text-blue-200 mt-0.5">Métadonnées du procès-verbal</p>
           </div>
           <div className="grid grid-cols-2">
             <MetaField label="Date de l'essai" value={meta.date_essai} />
@@ -177,49 +171,37 @@ export default function Validate() {
         </div>
 
         {/* Hint */}
-        <div className="flex items-center gap-2.5 text-xs px-4 py-3 rounded-xl"
-          style={{ color: 'rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-          <svg className="w-4 h-4 flex-shrink-0" style={{ color: '#818cf8' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="flex items-center gap-2.5 text-xs text-slate-400 bg-white border border-gray-100 rounded-xl px-4 py-3"
+          style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
+          <svg className="w-4 h-4 text-brand-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
           </svg>
           Cliquez sur n'importe quelle cellule de donnée pour la modifier. Sauvegardez quand vous avez terminé.
         </div>
 
-        {/* Section A */}
-        <div style={CARD}>
-          <SectionATable data={data.section_a} onSave={handleCellSave} />
-        </div>
-
-        {/* Section B1 */}
-        <div style={CARD}>
-          <SectionB1Table data={data.section_b1} onSave={handleCellSave} />
-        </div>
-
-        {/* Section B2 */}
-        <div style={CARD}>
-          <SectionB2Table data={data.section_b2} onSave={handleCellSave} />
-        </div>
+        {/* Sections */}
+        <div style={CARD}><SectionATable data={data.section_a} onSave={handleCellSave} /></div>
+        <div style={CARD}><SectionB1Table data={data.section_b1} onSave={handleCellSave} /></div>
+        <div style={CARD}><SectionB2Table data={data.section_b2} onSave={handleCellSave} /></div>
 
         {/* Correction log */}
         {corrections.length > 0 && (
-          <div className="p-5 rounded-2xl" style={{ background: '#111827', border: '1px solid rgba(251,191,36,0.2)' }}>
+          <div className="bg-white rounded-2xl border border-amber-100 p-5"
+            style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
             <div className="flex items-center gap-2 mb-4">
               <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-              <h3 className="text-sm font-semibold text-white">Corrections en attente ({corrections.length})</h3>
+              <h3 className="text-sm font-semibold text-gray-700">Corrections en attente ({corrections.length})</h3>
             </div>
             <div className="space-y-2">
               {corrections.map((c, i) => (
-                <div key={i} className="flex items-center gap-3 text-xs px-3 py-2.5 rounded-lg"
-                  style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.1)' }}>
-                  <code className="px-2 py-0.5 rounded font-mono" style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                    {c.field_path}
-                  </code>
-                  <span className="line-through font-medium" style={{ color: '#f87171' }}>{c.old_value}</span>
-                  <svg className="w-3 h-3 flex-shrink-0" style={{ color: 'rgba(255,255,255,0.2)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div key={i} className="flex items-center gap-3 text-xs bg-amber-50 px-3 py-2 rounded-lg border border-amber-100">
+                  <code className="bg-white border border-amber-100 px-2 py-0.5 rounded text-slate-500 font-mono">{c.field_path}</code>
+                  <span className="text-red-400 line-through font-medium">{c.old_value}</span>
+                  <svg className="w-3 h-3 text-slate-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
-                  <span className="font-semibold" style={{ color: '#4ade80' }}>{c.new_value}</span>
+                  <span className="text-green-600 font-semibold">{c.new_value}</span>
                 </div>
               ))}
             </div>
