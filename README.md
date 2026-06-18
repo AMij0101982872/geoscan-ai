@@ -194,10 +194,46 @@ Export Excel (.xlsx) formaté
 
 ## Gestion des comptes
 
-Les comptes sont créés manuellement par l'administrateur via **Supabase → Authentication → Users → Add user**.  
-Aucune inscription publique n'est disponible dans l'interface.
+Aucune inscription publique — les comptes sont créés et gérés manuellement par l'administrateur via **Supabase → SQL Editor**.
 
 Contact admin : akeivanjr10@gmail.com
+
+### Créer un utilisateur
+
+```sql
+INSERT INTO auth.users (
+  id, instance_id, aud, role,
+  email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data,
+  created_at, updated_at
+) VALUES (
+  gen_random_uuid(),
+  '00000000-0000-0000-0000-000000000000',
+  'authenticated', 'authenticated',
+  'utilisateur@exemple.com',
+  crypt('MotDePasse123', gen_salt('bf')),
+  now(),
+  '{"provider":"email","providers":["email"]}',
+  '{}',
+  now(), now()
+);
+```
+
+### Modifier le mot de passe
+
+```sql
+UPDATE auth.users
+SET encrypted_password = crypt('nouveauMDP123', gen_salt('bf'))
+WHERE email = 'utilisateur@exemple.com';
+```
+
+### Modifier l'email
+
+```sql
+UPDATE auth.users
+SET email = 'nouvel@email.com'
+WHERE email = 'ancien@email.com';
+```
 
 ---
 
