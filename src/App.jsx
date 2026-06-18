@@ -5,6 +5,7 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Upload from './pages/Upload'
 import Validate from './pages/Validate'
+import Settings from './pages/Settings'
 import Layout from './components/Layout'
 
 function PrivateRoute({ children, session }) {
@@ -54,6 +55,13 @@ export default function App() {
         <PrivateRoute session={session}>
           <Layout session={session}>
             <Validate session={session} />
+          </Layout>
+        </PrivateRoute>
+      } />
+      <Route path="/settings" element={
+        <PrivateRoute session={session}>
+          <Layout session={session}>
+            <Settings session={session} />
           </Layout>
         </PrivateRoute>
       } />

@@ -1,4 +1,5 @@
 import XLSX from 'xlsx-js-style'
+import { getSetting, KEYS } from './settings'
 
 const DARK = '1F2D5C'
 const BLUE = '2F5496'
@@ -32,6 +33,9 @@ export function exportToExcel(report) {
   const b1 = d?.section_b1?.mesures || []
   const b2 = d?.section_b2?.mesures || []
 
+  const labName = getSetting(KEYS.LAB_NAME)
+  const normRef = getSetting(KEYS.NORM_REF) || 'ISO 17892-12'
+
   const ws = {}
   const merges = []
 
@@ -52,11 +56,19 @@ export function exportToExcel(report) {
   let r = 1
 
   // ─── TITRE ──────────────────────────────────────────────────────────
-  set(r, 1, "MINUTES - DÉTERMINATION DES LIMITES D'ATTERBERG (ISO 17892-12 Version 2018)",
+  set(r, 1, `MINUTES - DÉTERMINATION DES LIMITES D'ATTERBERG (${normRef})`,
     { bg: DARK, bold: true, halign: 'center', sz: 12 })
   fillRow(r, { bg: DARK })
   merge(r, 1, r, NCOLS)
   r++
+
+  // Nom du laboratoire (si renseigné)
+  if (labName) {
+    set(r, 1, labName, { bg: DARK, halign: 'center', sz: 10, fc: 'A0AEC0' })
+    fillRow(r, { bg: DARK })
+    merge(r, 1, r, NCOLS)
+    r++
+  }
 
   r++ // ligne vide
 
