@@ -18,7 +18,7 @@ const FEATURES = [
           d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
       </svg>
     ),
-    label: 'Extraction IA (Gemini 2.0)',
+    label: 'Extraction IA automatique',
   },
   {
     icon: (
@@ -36,7 +36,7 @@ const FEATURES = [
           d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
       </svg>
     ),
-    label: 'Export Excel formaté (ISO 17892-12)',
+    label: 'Export Excel formaté',
   },
 ]
 
@@ -95,11 +95,6 @@ export default function Login() {
 
         {/* Main copy */}
         <div className="relative">
-          <div className="inline-flex items-center gap-2 bg-white/10 border border-white/10 text-blue-300 text-xs font-medium px-3 py-1.5 rounded-full mb-6">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-            Propulsé par Gemini 2.0 Flash
-          </div>
-
           <h2 className="text-4xl font-bold text-white leading-tight mb-5">
             Digitalisez vos<br />
             rapports<br />
@@ -128,7 +123,6 @@ export default function Login() {
         {/* Footer */}
         <div className="relative flex items-center justify-between">
           <span className="text-slate-600 text-xs">© 2026 GeoScan AI</span>
-          <span className="text-slate-600 text-xs">HESTIM</span>
         </div>
       </div>
 
