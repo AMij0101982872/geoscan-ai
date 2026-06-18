@@ -85,9 +85,34 @@ const CustomPieTooltip = ({ active, payload }) => {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
+function DeleteModal({ onConfirm, onCancel }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onCancel} />
+      <div className="relative bg-white rounded-2xl shadow-2xl border border-gray-100 p-6 w-full max-w-sm">
+        <div className="w-12 h-12 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+        </div>
+        <h3 className="text-base font-bold text-gray-900 text-center mb-1">Supprimer ce rapport ?</h3>
+        <p className="text-sm text-slate-400 text-center mb-6">Cette action est irréversible.</p>
+        <div className="flex gap-3">
+          <button onClick={onCancel} className="flex-1 btn-secondary py-2.5">Annuler</button>
+          <button onClick={onConfirm} className="flex-1 py-2.5 px-4 bg-red-500 hover:bg-red-600 text-white text-sm font-semibold rounded-xl transition-colors">
+            Supprimer
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Dashboard({ session }) {
   const [reports, setReports] = useState([])
   const [loading, setLoading] = useState(true)
+  const [confirmDelete, setConfirmDelete] = useState(null)
 
   useEffect(() => {
     fetchReports()
@@ -105,9 +130,9 @@ export default function Dashboard({ session }) {
   }
 
   async function deleteReport(id) {
-    if (!confirm('Supprimer ce rapport ?')) return
     await supabase.from('reports').delete().eq('id', id)
     setReports(r => r.filter(x => x.id !== id))
+    setConfirmDelete(null)
   }
 
   const total = reports.length
@@ -119,6 +144,12 @@ export default function Dashboard({ session }) {
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
+      {confirmDelete && (
+        <DeleteModal
+          onConfirm={() => deleteReport(confirmDelete)}
+          onCancel={() => setConfirmDelete(null)}
+        />
+      )}
 
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
@@ -340,7 +371,7 @@ export default function Dashboard({ session }) {
                         </Link>
                       )}
                       <button
-                        onClick={() => deleteReport(r.id)}
+                        onClick={() => setConfirmDelete(r.id)}
                         className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                         title="Supprimer"
                       >
