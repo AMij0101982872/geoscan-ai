@@ -43,24 +43,15 @@ const FEATURES = [
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [mode, setMode] = useState('login')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
 
   async function handleSubmit(e) {
     e.preventDefault()
     setLoading(true)
     setError('')
-    setSuccess('')
-    if (mode === 'login') {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) setError(error.message)
-    } else {
-      const { error } = await supabase.auth.signUp({ email, password })
-      if (error) setError(error.message)
-      else setSuccess('Compte créé ! Vérifiez votre email.')
-    }
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) setError(error.message)
     setLoading(false)
   }
 
@@ -148,14 +139,8 @@ export default function Login() {
 
             {/* Heading */}
             <div className="mb-7">
-              <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
-                {mode === 'login' ? 'Connexion' : 'Créer un compte'}
-              </h1>
-              <p className="text-sm text-slate-400 mt-1.5">
-                {mode === 'login'
-                  ? 'Accédez à votre espace de travail'
-                  : 'Rejoignez GeoScan AI dès maintenant'}
-              </p>
+              <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Connexion</h1>
+              <p className="text-sm text-slate-400 mt-1.5">Accédez à votre espace de travail</p>
             </div>
 
             {/* Form */}
@@ -204,7 +189,7 @@ export default function Login() {
                 </div>
               </div>
 
-              {/* Error / Success */}
+              {/* Error */}
               {error && (
                 <div className="flex items-start gap-2.5 bg-red-50 text-red-700 text-sm px-4 py-3 rounded-xl border border-red-100">
                   <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -212,15 +197,6 @@ export default function Login() {
                       d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   {error}
-                </div>
-              )}
-              {success && (
-                <div className="flex items-center gap-2.5 bg-green-50 text-green-700 text-sm px-4 py-3 rounded-xl border border-green-100">
-                  <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  {success}
                 </div>
               )}
 
@@ -234,28 +210,11 @@ export default function Login() {
                 {loading ? (
                   <>
                     <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
-                    Chargement…
+                    Connexion…
                   </>
-                ) : (
-                  mode === 'login' ? 'Se connecter' : 'Créer le compte'
-                )}
+                ) : 'Se connecter'}
               </button>
             </form>
-
-            {/* Divider */}
-            <div className="flex items-center gap-3 my-5">
-              <div className="flex-1 h-px bg-slate-100" />
-              <span className="text-xs text-slate-300">ou</span>
-              <div className="flex-1 h-px bg-slate-100" />
-            </div>
-
-            {/* Toggle mode */}
-            <button
-              onClick={() => { setMode(m => m === 'login' ? 'register' : 'login'); setError(''); setSuccess('') }}
-              className="w-full py-3 rounded-xl border border-slate-200 text-sm font-medium text-slate-500 hover:bg-slate-50 hover:border-slate-300 hover:text-slate-700 transition-all"
-            >
-              {mode === 'login' ? "Pas encore de compte ? S'inscrire" : 'Déjà un compte ? Se connecter'}
-            </button>
 
           </div>
 
