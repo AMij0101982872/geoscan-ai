@@ -5,7 +5,15 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 )
 
-const CLAUDE_PROMPT = `Tu es un expert en extraction de données de documents géotechniques manuscrits.
+// Modèles tentés dans l'ordre — si l'un est surchargé ou indispo, on passe au suivant
+const GEMINI_MODELS = [
+  'gemini-2.0-flash',
+  'gemini-2.0-flash-lite',
+  'gemini-2.5-flash-lite',
+  'gemini-2.5-flash',
+]
+
+const PROMPT = `Tu es un expert en extraction de données de documents géotechniques manuscrits.
 Analyse ce procès-verbal de détermination des Limites d'Atterberg (ISO 17892-12).
 
 Extrait TOUTES les valeurs visibles dans le document, même si l'écriture est difficile à lire.
@@ -67,6 +75,42 @@ Structure exacte attendue :
   }
 }`
 
+async function callGeminiWithFallback(base64) {
+  let lastError = ''
+  for (const model of GEMINI_MODELS) {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [
+            { inline_data: { mime_type: 'application/pdf', data: base64 } },
+            { text: PROMPT },
+          ]}],
+          generationConfig: { temperature: 0.1 },
+        }),
+      }
+    )
+
+    // 503 = surchargé, 429 = quota → on essaie le modèle suivant
+    if (res.status === 503 || res.status === 429) {
+      lastError = `${model} indisponible (${res.status})`
+      continue
+    }
+
+    if (!res.ok) {
+      const err = await res.text()
+      throw new Error(`Gemini error (${model}): ${err}`)
+    }
+
+    const json = await res.json()
+    return json.candidates[0].content.parts[0].text
+  }
+
+  throw new Error(`Tous les modèles Gemini sont indisponibles. Dernier: ${lastError}`)
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
@@ -79,47 +123,21 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 1. Mettre le statut en processing
     await supabase.from('reports').update({ status: 'processing' }).eq('id', report_id)
 
-    // 2. Télécharger le PDF depuis Supabase Storage
     const { data: fileData, error: downloadError } = await supabase.storage
-      .from('pdfs')
-      .download(pdf_path)
+      .from('pdfs').download(pdf_path)
 
     if (downloadError) throw new Error(`Download error: ${downloadError.message}`)
 
     const buffer = await fileData.arrayBuffer()
     const base64 = Buffer.from(buffer).toString('base64')
 
-    // 3. Appeler Gemini API
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { inline_data: { mime_type: 'application/pdf', data: base64 } },
-              { text: CLAUDE_PROMPT },
-            ],
-          }],
-          generationConfig: { temperature: 0.1 },
-        }),
-      }
-    )
+    const rawText = await callGeminiWithFallback(base64)
+    const jsonMatch = rawText.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) throw new Error('Aucun JSON trouvé dans la réponse Gemini')
+    const raw_json = JSON.parse(jsonMatch[0])
 
-    if (!geminiRes.ok) {
-      const err = await geminiRes.text()
-      throw new Error(`Gemini API error: ${err}`)
-    }
-
-    const gemini = await geminiRes.json()
-    const rawText = gemini.candidates[0].content.parts[0].text.replace(/```json|```/g, '').trim()
-    const raw_json = JSON.parse(rawText)
-
-    // 4. Sauvegarder les données extraites
     await supabase.from('reports').update({
       raw_json,
       status: 'done',
@@ -129,10 +147,9 @@ export default async function handler(req, res) {
     return res.status(200).json({ success: true, data: raw_json })
 
   } catch (err) {
-    console.error('Extraction error:', err)
+    console.error('Extraction error:', err.message)
     await supabase.from('reports').update({
       status: 'error',
-      error_msg: err.message,
       updated_at: new Date().toISOString(),
     }).eq('id', report_id)
 
