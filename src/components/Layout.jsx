@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useTheme } from '../lib/theme'
 
 const navItems = [
   {
@@ -24,9 +25,28 @@ const navItems = [
   },
 ]
 
+function SunIcon() {
+  return (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+        d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+    </svg>
+  )
+}
+
+function MoonIcon() {
+  return (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+        d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+    </svg>
+  )
+}
+
 export default function Layout({ children, session }) {
   const location = useLocation()
   const navigate = useNavigate()
+  const { isDark, toggle } = useTheme()
 
   async function handleLogout() {
     await supabase.auth.signOut()
@@ -39,7 +59,7 @@ export default function Layout({ children, session }) {
   return (
     <div className="min-h-screen flex">
 
-      {/* Sidebar */}
+      {/* Sidebar — always dark navy */}
       <aside
         className="w-[240px] h-screen sticky top-0 flex flex-col flex-shrink-0"
         style={{
@@ -81,9 +101,7 @@ export default function Layout({ children, session }) {
                     background: 'rgba(79,110,247,0.14)',
                     color: '#ffffff',
                     boxShadow: 'inset 3px 0 0 #4f6ef7',
-                  } : {
-                    color: '#6b7591',
-                  }}
+                  } : { color: '#6b7591' }}
                   onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
                   onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}
                 >
@@ -93,8 +111,7 @@ export default function Layout({ children, session }) {
                   </span>
                   <span className="flex-1">{item.label}</span>
                   {active && (
-                    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                      style={{ background: '#4f6ef7' }} />
+                    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: '#4f6ef7' }} />
                   )}
                 </Link>
               )
@@ -102,9 +119,35 @@ export default function Layout({ children, session }) {
           </div>
         </nav>
 
-        {/* User */}
-        <div className="p-3 flex-shrink-0" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-          <div className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl mb-1"
+        {/* Bottom section */}
+        <div className="px-3 pb-3 flex-shrink-0 space-y-1" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '12px' }}>
+
+          {/* Theme toggle */}
+          <button
+            onClick={toggle}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all duration-150"
+            style={{ color: 'rgba(255,255,255,0.4)' }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; e.currentTarget.style.color = 'rgba(255,255,255,0.75)' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.4)' }}
+          >
+            <span style={{ color: isDark ? '#fbbf24' : '#818cf8' }}>
+              {isDark ? <SunIcon /> : <MoonIcon />}
+            </span>
+            <span>{isDark ? 'Mode clair' : 'Mode sombre'}</span>
+            <span className="ml-auto flex items-center">
+              <span className="relative inline-flex w-8 h-4 rounded-full transition-colors duration-200"
+                style={{ background: isDark ? 'rgba(251,191,36,0.3)' : 'rgba(129,140,248,0.3)' }}>
+                <span className="absolute top-0.5 w-3 h-3 rounded-full transition-all duration-200"
+                  style={{
+                    background: isDark ? '#fbbf24' : '#818cf8',
+                    left: isDark ? '1px' : '17px',
+                  }} />
+              </span>
+            </span>
+          </button>
+
+          {/* User */}
+          <div className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl"
             style={{ background: 'rgba(255,255,255,0.04)' }}>
             <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
               style={{ background: 'linear-gradient(135deg, #4f6ef7, #818cf8)' }}>
@@ -120,6 +163,7 @@ export default function Layout({ children, session }) {
               </div>
             </div>
           </div>
+
           <button
             onClick={handleLogout}
             className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs transition-all duration-150"
@@ -137,7 +181,7 @@ export default function Layout({ children, session }) {
       </aside>
 
       {/* Main */}
-      <main className="flex-1 overflow-auto" style={{ background: '#f5f7fb' }}>
+      <main className="flex-1 overflow-auto" style={{ background: isDark ? '#0c1220' : '#f5f7fb' }}>
         {children}
       </main>
     </div>
