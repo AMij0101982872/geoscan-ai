@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useTheme, T } from '../lib/theme'
+import { extractFromPdf } from '../lib/gemini'
 
 const STEPS = [
   {
@@ -87,15 +88,23 @@ export default function Upload({ session }) {
         .select().single()
       if (dbError) throw dbError
 
-      const res = await fetch('/api/extract', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ report_id: report.id, pdf_path: filePath }),
-      })
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error(body.error || `Erreur extraction (HTTP ${res.status})`)
+      // Extraction directement depuis le navigateur — pas de timeout Vercel
+      let raw_json
+      try {
+        raw_json = await extractFromPdf(file)
+      } catch (geminiErr) {
+        await supabase.from('reports')
+          .update({ status: 'error', updated_at: new Date().toISOString() })
+          .eq('id', report.id)
+        throw geminiErr
       }
+
+      await supabase.from('reports').update({
+        raw_json,
+        status: 'done',
+        updated_at: new Date().toISOString(),
+      }).eq('id', report.id)
+
       navigate(`/reports/${report.id}`)
     } catch (err) {
       setError(err.message || 'Une erreur est survenue.')
