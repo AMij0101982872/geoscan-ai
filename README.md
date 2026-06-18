@@ -14,9 +14,11 @@ Extraction automatique de données géotechniques manuscrites — PDF vers Excel
 - **Extraction IA** — Gemini 2.0 Flash lit les données manuscrites et les structure en JSON
 - **Fallback automatique** — si un modèle est surchargé, bascule sur le suivant (4 modèles en cascade)
 - **Validation manuelle** — interface éditable cellule par cellule, corrections tracées
-- **Export Excel** — fichier `.xlsx` formaté (couleurs, sections, entêtes) identique au document officiel
+- **Export Excel** — fichier `.xlsx` formaté (couleurs, sections, en-têtes) identique au document officiel
 - **Tableau de bord** — historique des rapports, graphiques d'activité et de statuts
-- **Authentification** — comptes utilisateurs sécurisés via Supabase Auth
+- **Thème clair / sombre** — toggle persistent par utilisateur
+- **Paramètres** — nom d'affichage, apparence, en-tête Excel personnalisé
+- **Comptes gérés par l'admin** — pas d'inscription publique, accès sur invitation
 
 ---
 
@@ -25,11 +27,13 @@ Extraction automatique de données géotechniques manuscrites — PDF vers Excel
 | Couche | Technologie |
 |--------|------------|
 | Frontend | React 18 + Vite + TailwindCSS |
-| Backend | Vercel Serverless Functions (Node.js) |
+| Hébergement | Vercel (Hobby — gratuit) |
 | Base de données | Supabase (PostgreSQL + Storage + Auth) |
-| IA | Google Gemini API (`gemini-2.0-flash`) |
+| IA | Google Gemini API (`gemini-2.0-flash`, fallback cascade) |
 | Export | xlsx-js-style |
 | Graphiques | Recharts |
+
+> L'extraction Gemini se fait **directement depuis le navigateur** — aucune fonction serverless, aucune limite de timeout.
 
 ---
 
@@ -44,7 +48,7 @@ cp .env.local.example .env.local
 npm run dev
 ```
 
-L'app tourne sur `http://localhost:5173`, l'API sur `http://localhost:3001`.
+L'app tourne sur `http://localhost:5173`.
 
 ---
 
@@ -56,12 +60,12 @@ Créer un fichier `.env.local` à la racine :
 # Supabase
 VITE_SUPABASE_URL=https://xxxx.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJ...
-SUPABASE_URL=https://xxxx.supabase.co
-SUPABASE_SERVICE_KEY=eyJ...
 
 # Gemini (Google AI Studio — gratuit)
-GEMINI_API_KEY=AIzaSy...
+VITE_GEMINI_API_KEY=AIzaSy...
 ```
+
+Les mêmes variables doivent être déclarées dans **Vercel → Settings → Environment Variables**.
 
 ---
 
@@ -110,15 +114,18 @@ create policy "Users access own pdfs" on storage.objects for all
   using (bucket_id = 'pdfs' and auth.uid()::text = (storage.foldername(name))[1]);
 ```
 
+4. Dans **Authentication → Users**, créer les comptes manuellement (pas d'inscription publique).
+
 ---
 
 ## Déploiement Vercel
 
 1. Importer le repo sur [vercel.com](https://vercel.com)
-2. Ajouter les variables d'environnement dans **Settings → Environment Variables**
-3. Passer au plan **Pro** (20$/mois) — nécessaire car l'extraction prend ~30s (limite gratuit : 10s)
-
-> **Note :** Le fichier `vercel.json` configure déjà `maxDuration: 60` pour les fonctions API.
+2. Ajouter les variables d'environnement dans **Settings → Environment Variables** :
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+   - `VITE_GEMINI_API_KEY`
+3. Déployer — **plan Hobby (gratuit) suffisant**, aucune fonction serverless utilisée
 
 ---
 
@@ -126,24 +133,25 @@ create policy "Users access own pdfs" on storage.objects for all
 
 ```
 geoscan-ai/
-├── api/
-│   └── extract.js          # Serverless function : PDF → Gemini → JSON → Supabase
 ├── src/
 │   ├── pages/
-│   │   ├── Login.jsx        # Authentification
+│   │   ├── Login.jsx        # Connexion uniquement (comptes gérés par admin)
 │   │   ├── Dashboard.jsx    # Tableau de bord + graphiques
-│   │   ├── Upload.jsx       # Upload PDF + lancement extraction
-│   │   └── Validate.jsx     # Validation manuelle + export
+│   │   ├── Upload.jsx       # Upload PDF + extraction Gemini
+│   │   ├── Validate.jsx     # Validation manuelle + export Excel
+│   │   └── Settings.jsx     # Paramètres utilisateur
 │   ├── components/
-│   │   ├── Layout.jsx       # Sidebar navigation
+│   │   ├── Layout.jsx       # Sidebar navigation + thème toggle
 │   │   ├── DataTable.jsx    # Tables éditables (Sections A, B1, B2)
-│   │   ├── StatusBadge.jsx  # Indicateurs de statut
-│   │   └── ExportBtn.jsx    # Bouton export Excel
+│   │   └── StatusBadge.jsx  # Indicateurs de statut
 │   └── lib/
 │       ├── supabase.js      # Client Supabase
-│       └── exportExcel.js   # Génération fichier Excel formaté
-├── dev-server.mjs           # Serveur API local (développement)
-└── vercel.json              # Config déploiement Vercel
+│       ├── gemini.js        # Appel API Gemini (fallback cascade, base64 browser)
+│       ├── exportExcel.js   # Génération fichier Excel formaté
+│       ├── theme.jsx        # ThemeContext (clair/sombre, localStorage)
+│       └── settings.js      # Préférences utilisateur (localStorage)
+└── api/
+    └── extract.js           # Conservé pour référence (non utilisé en prod)
 ```
 
 ---
@@ -151,11 +159,13 @@ geoscan-ai/
 ## Flux de traitement
 
 ```
-PDF manuscrit
+PDF manuscrit (fichier local)
     ↓
 Supabase Storage (upload)
     ↓
-Gemini 2.0 Flash (extraction IA)
+Conversion base64 dans le navigateur
+    ↓
+Gemini 2.0 Flash — appel direct depuis le browser
     ↓  [fallback automatique si 503/429]
 gemini-2.0-flash-lite → gemini-2.5-flash-lite → gemini-2.5-flash
     ↓
@@ -170,14 +180,24 @@ Export Excel (.xlsx) formaté
 
 ---
 
-## Limites du plan gratuit
+## Plan tarifaire — 100% gratuit pour 5 utilisateurs
 
-| Service | Limite gratuite | Usage estimé (5 users) |
-|---------|----------------|----------------------|
-| Gemini API | 1 500 req/jour | ~150/jour |
-| Supabase DB | 500 MB | < 10 MB |
-| Supabase Storage | 1 GB | ~750 MB (PDFs) |
-| Vercel | 10s timeout | **Insuffisant** → Pro requis |
+| Service | Plan | Limite | Usage estimé |
+|---------|------|--------|--------------|
+| Vercel | Hobby (gratuit) | — | Hébergement statique uniquement |
+| Gemini API | Free | 1 500 req/jour | ~50–100/jour |
+| Supabase DB | Free | 500 MB | < 10 MB |
+| Supabase Storage | Free | 1 GB | ~500 MB (PDFs) |
+| Supabase Auth | Free | 50 000 MAU | 5 utilisateurs |
+
+---
+
+## Gestion des comptes
+
+Les comptes sont créés manuellement par l'administrateur via **Supabase → Authentication → Users → Add user**.  
+Aucune inscription publique n'est disponible dans l'interface.
+
+Contact admin : akeivanjr10@gmail.com
 
 ---
 
