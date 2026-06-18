@@ -71,7 +71,7 @@ export default function Validate() {
   const meta = data.meta || {}
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full">
 
       {/* Sticky top bar */}
       <div className="sticky top-0 z-10 bg-white/90 backdrop-blur border-b border-gray-100 shadow-sm">
