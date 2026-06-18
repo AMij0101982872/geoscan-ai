@@ -4,7 +4,7 @@ Extraction automatique de données géotechniques manuscrites — PDF vers Excel
 
 > Dépose un procès-verbal Atterberg (ISO 17892-12) manuscrit, l'IA lit les données, tu valides, tu exportes en Excel formaté.
 
-**Live :** [geoscan-ai.vercel.app](https://geoscan-ai.vercel.app) &nbsp;·&nbsp; **Repo :** [github.com/AMij0101982872/geoscan-ai](https://github.com/AMij0101982872/geoscan-ai)
+**Live :** [geoscan-ai-sage.vercel.app](https://geoscan-ai-sage.vercel.app) &nbsp;·&nbsp; **Repo :** [github.com/AMij0101982872/geoscan-ai](https://github.com/AMij0101982872/geoscan-ai)
 
 ---
 
