@@ -41,7 +41,7 @@ export default function Layout({ children, session }) {
 
       {/* Sidebar */}
       <aside
-        className="w-[240px] flex flex-col flex-shrink-0 relative"
+        className="w-[240px] h-screen sticky top-0 flex flex-col flex-shrink-0"
         style={{
           background: 'linear-gradient(180deg, #0f1623 0%, #0c1220 100%)',
           borderRight: '1px solid rgba(255,255,255,0.05)',
