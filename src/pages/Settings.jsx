@@ -158,6 +158,16 @@ export default function Settings({ session }) {
 
   async function deleteAllReports() {
     setDeleting(true); setDeleteError('')
+
+    const { data: toDelete, error: fetchError } = await supabase
+      .from('reports').select('pdf_path').eq('user_id', session.user.id)
+    if (fetchError) { setDeleting(false); setDeleteError(fetchError.message); return }
+
+    const paths = (toDelete || []).map(r => r.pdf_path).filter(Boolean)
+    if (paths.length > 0) {
+      await supabase.storage.from('pdfs').remove(paths)
+    }
+
     const { error } = await supabase.from('reports').delete().eq('user_id', session.user.id)
     setDeleting(false)
     if (error) { setDeleteError(error.message); return }

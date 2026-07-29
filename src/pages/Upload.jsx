@@ -49,6 +49,8 @@ const STEPS = [
   },
 ]
 
+const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 Mo
+
 export default function Upload({ session }) {
   const { isDark } = useTheme()
   const t = isDark ? T.dark : T.light
@@ -60,17 +62,22 @@ export default function Upload({ session }) {
   const inputRef = useRef()
   const navigate = useNavigate()
 
+  function validateAndSetFile(f) {
+    if (!f) return
+    if (f.type !== 'application/pdf') { setError('Seuls les fichiers PDF sont acceptés.'); return }
+    if (f.size > MAX_FILE_SIZE) { setError('Le fichier dépasse la taille maximale de 10 Mo.'); return }
+    setFile(f)
+    setError('')
+  }
+
   function handleDrop(e) {
     e.preventDefault()
     setDragging(false)
-    const f = e.dataTransfer.files[0]
-    if (f?.type === 'application/pdf') { setFile(f); setError('') }
-    else setError('Seuls les fichiers PDF sont acceptés.')
+    validateAndSetFile(e.dataTransfer.files[0])
   }
 
   function handleFile(e) {
-    const f = e.target.files[0]
-    if (f) { setFile(f); setError('') }
+    validateAndSetFile(e.target.files[0])
   }
 
   async function handleUpload() {
