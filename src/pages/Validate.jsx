@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useTheme, T } from '../lib/theme'
-import { SectionATable, SectionB1Table, SectionB2Table } from '../components/DataTable'
+import { SectionTable } from '../components/DataTable'
 import ExportBtn from '../components/ExportBtn'
 
 function MetaField({ label, value, t }) {
@@ -76,7 +76,8 @@ export default function Validate() {
     <div className="p-8 text-sm" style={{ color: '#f87171', background: t.bg }}>Rapport introuvable.</div>
   )
 
-  const meta = data.meta || {}
+  const meta = Array.isArray(data.meta) ? data.meta : []
+  const sections = Array.isArray(data.sections) ? data.sections : []
 
   return (
     <div className="min-h-full" style={{ background: t.bg }}>
@@ -101,6 +102,9 @@ export default function Validate() {
             <div>
               <div className="text-sm font-semibold leading-tight" style={{ color: t.text }}>{report.filename}</div>
               <div className="flex items-center gap-2 text-xs mt-0.5" style={{ color: t.textMuted }}>
+                {data.document_type && (
+                  <span className="font-semibold" style={{ color: '#818cf8' }}>{data.document_type}</span>
+                )}
                 <span>{new Date(report.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
                 {report.validated && corrections.length === 0 && (
                   <span className="inline-flex items-center gap-1 font-semibold" style={{ color: '#22c55e' }}>
@@ -153,22 +157,19 @@ export default function Validate() {
       <div className="max-w-5xl mx-auto px-8 py-7 space-y-4">
 
         {/* Meta card */}
-        <div style={CARD}>
-          <div className="px-5 py-4" style={{ background: 'linear-gradient(135deg, #1e2d5c 0%, #2f5496 100%)', borderBottom: `1px solid ${t.divider}` }}>
-            <h2 className="text-sm font-bold text-white uppercase tracking-wider">Informations générales</h2>
-            <p className="text-xs text-blue-200 mt-0.5">Métadonnées du procès-verbal</p>
+        {meta.length > 0 && (
+          <div style={CARD}>
+            <div className="px-5 py-4" style={{ background: 'linear-gradient(135deg, #1e2d5c 0%, #2f5496 100%)', borderBottom: `1px solid ${t.divider}` }}>
+              <h2 className="text-sm font-bold text-white uppercase tracking-wider">Informations générales</h2>
+              <p className="text-xs text-blue-200 mt-0.5">{data.document_type || 'Métadonnées du procès-verbal'}{data.reference_norme ? ` — ${data.reference_norme}` : ''}</p>
+            </div>
+            <div className="grid grid-cols-2" style={{ background: t.card.background }}>
+              {meta.map((m, i) => (
+                <MetaField key={i} label={m.label} value={m.value} t={t} />
+              ))}
+            </div>
           </div>
-          <div className="grid grid-cols-2" style={{ background: t.card.background }}>
-            <MetaField label="Date de l'essai" value={meta.date_essai} t={t} />
-            <MetaField label="Opérateur" value={meta.operateur} t={t} />
-            <MetaField label="Code balances" value={meta.code_balances} t={t} />
-            <MetaField label="Code étuve" value={meta.code_etuve} t={t} />
-            <MetaField label="Code Casagrande" value={meta.code_casagrande} t={t} />
-            <MetaField label="Code échantillon" value={meta.code_echantillon} t={t} />
-            <MetaField label="Référence" value={meta.ref} t={t} />
-            <MetaField label="Version" value={meta.version} t={t} />
-          </div>
-        </div>
+        )}
 
         {/* Hint */}
         <div className="flex items-center gap-2.5 text-xs px-4 py-3 rounded-xl"
@@ -181,9 +182,11 @@ export default function Validate() {
         </div>
 
         {/* Sections */}
-        <div style={CARD}><SectionATable data={data.section_a} onSave={handleCellSave} /></div>
-        <div style={CARD}><SectionB1Table data={data.section_b1} onSave={handleCellSave} /></div>
-        <div style={CARD}><SectionB2Table data={data.section_b2} onSave={handleCellSave} /></div>
+        {sections.map((section, i) => (
+          <div key={i} style={CARD}>
+            <SectionTable section={section} sectionIndex={i} onSave={handleCellSave} />
+          </div>
+        ))}
 
         {/* Correction log */}
         {corrections.length > 0 && (

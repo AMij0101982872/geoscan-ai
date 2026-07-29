@@ -55,178 +55,59 @@ function EditableCell({ value, onSave, fieldPath, highlight = false }) {
 const SECTION_HEADER = { background: 'linear-gradient(135deg, #1e2d5c 0%, #2f5496 100%)' }
 const COL_HEADER = { background: '#2f5496' }
 
-function useTableTheme() {
+export function SectionTable({ section, sectionIndex, onSave }) {
   const { isDark } = useTheme()
   const t = isDark ? T.dark : T.light
-  return { isDark, t }
-}
 
-export function SectionATable({ data, onSave }) {
-  const { isDark, t } = useTableTheme()
-  const tares = data?.tares || []
-  const rows = [
-    { label: 'N° Tare',                              key: 'id' },
-    { label: 'Masse de la Tare vide (g)',            key: 'masse_tare' },
-    { label: 'Sol humide + tare (g)',                key: 'sol_humide_tare' },
-    { label: 'Sol sec + tare (g) – 1ère pesée',     key: 'sol_sec_1' },
-    { label: 'Sol sec + tare (g) – 2ème pesée',     key: 'sol_sec_2' },
-  ]
+  const columns = section?.columns || []
+  const rows = section?.rows || []
+  const ncols = Math.max(columns.length, ...rows.map(r => (r.values || []).length), 1)
+  const displayColumns = columns.length > 0
+    ? columns
+    : (ncols > 1 ? Array.from({ length: ncols }, (_, i) => `Col. ${i + 1}`) : [])
 
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm border-collapse">
         <thead>
           <tr>
-            <th colSpan={tares.length + 1} className="px-5 py-3 text-left text-xs font-bold text-white uppercase tracking-wider" style={SECTION_HEADER}>
-              Section A — Proportion &lt; 0,4 mm
+            <th colSpan={ncols + 1} className="px-5 py-3 text-left text-xs font-bold text-white uppercase tracking-wider" style={SECTION_HEADER}>
+              {section?.title || `Section ${sectionIndex + 1}`}
             </th>
           </tr>
-          <tr style={COL_HEADER}>
-            <th className="text-left px-5 py-2.5 text-xs font-semibold text-blue-100 w-72">Paramètre</th>
-            {tares.map((t2, i) => (
-              <th key={i} className="text-center px-4 py-2.5 text-xs font-semibold text-blue-100">
-                {t2.id ? `Tare — ${t2.id}` : `Tare ${i + 1}`}
-              </th>
-            ))}
-          </tr>
+          {displayColumns.length > 0 && (
+            <tr style={COL_HEADER}>
+              <th className="text-left px-5 py-2.5 text-xs font-semibold text-blue-100 w-72">Paramètre</th>
+              {displayColumns.map((c, i) => (
+                <th key={i} className="text-center px-4 py-2.5 text-xs font-semibold text-blue-100">{c}</th>
+              ))}
+            </tr>
+          )}
         </thead>
         <tbody>
           {rows.map((row, ri) => (
-            <tr key={row.key} className="transition-colors"
-              style={{ background: ri % 2 === 0 ? t.rowEven : t.rowOdd, borderBottom: `1px solid ${t.rowBorder}` }}
-              onMouseEnter={e => e.currentTarget.style.background = t.rowHover}
-              onMouseLeave={e => e.currentTarget.style.background = ri % 2 === 0 ? t.rowEven : t.rowOdd}>
-              <td className="px-5 py-3 font-medium text-sm" style={{ color: t.textSub }}>{row.label}</td>
-              {tares.map((t2, i) => (
-                <td key={i} className="px-4 py-3 text-center">
-                  <EditableCell value={t2[row.key]} fieldPath={`section_a.tares[${i}].${row.key}`} onSave={onSave} />
-                </td>
-              ))}
-            </tr>
-          ))}
-          {[
-            { label: 'Masse éprouvette non séchée (g)', key: 'masse_eprouvette', path: 'section_a.masse_eprouvette' },
-            { label: 'Masse retenue sur tamis 0,400 (g)', key: 'masse_retenue_tamis', path: 'section_a.masse_retenue_tamis' },
-          ].map(row => (
-            <tr key={row.key} style={{ borderBottom: `1px solid ${isDark ? 'rgba(251,146,60,0.15)' : 'rgba(251,146,60,0.2)'}` }}>
-              <td className="px-5 py-3 font-semibold text-sm" style={{ background: isDark ? 'rgba(251,146,60,0.08)' : 'rgba(255,237,213,0.6)', color: isDark ? '#fb923c' : '#9a3412' }}>
+            <tr key={ri} className="transition-colors"
+              style={row.highlight
+                ? { background: '#2f5496' }
+                : { background: ri % 2 === 0 ? t.rowEven : t.rowOdd, borderBottom: `1px solid ${t.rowBorder}` }}
+              onMouseEnter={e => { if (!row.highlight) e.currentTarget.style.background = t.rowHover }}
+              onMouseLeave={e => { if (!row.highlight) e.currentTarget.style.background = ri % 2 === 0 ? t.rowEven : t.rowOdd }}>
+              <td className="px-5 py-3 font-medium text-sm"
+                style={{ color: row.highlight ? '#ffffff' : t.textSub, fontWeight: row.highlight ? 600 : 500 }}>
                 {row.label}
               </td>
-              <td className="px-4 py-3 text-center" style={{ background: isDark ? 'rgba(251,146,60,0.04)' : 'rgba(255,237,213,0.3)' }} colSpan={tares.length}>
-                <EditableCell value={data?.[row.key]} fieldPath={row.path} onSave={onSave} />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-export function SectionB1Table({ data, onSave }) {
-  const { t } = useTableTheme()
-  const mesures = data?.mesures || []
-  const rows = [
-    { label: 'Nombre de rotations',              key: 'nb_rotations' },
-    { label: 'N° Tare',                          key: 'tare' },
-    { label: 'Masse de la Tare vide (g)',        key: 'masse_tare' },
-    { label: 'Sol humide + tare (g)',            key: 'sol_humide_tare' },
-    { label: 'Sol sec + tare (g) – 1ère pesée', key: 'sol_sec_1' },
-    { label: 'Sol sec + tare (g) – 2ème pesée', key: 'sol_sec_2' },
-  ]
-
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm border-collapse">
-        <thead>
-          <tr>
-            <th colSpan={mesures.length + 1} className="px-5 py-3 text-left text-xs font-bold text-white uppercase tracking-wider" style={SECTION_HEADER}>
-              B-1 — Limite de Liquidité
-            </th>
-          </tr>
-          <tr style={COL_HEADER}>
-            <th className="text-left px-5 py-2.5 text-xs font-semibold text-blue-100 w-72">Paramètre</th>
-            {mesures.map((_, i) => (
-              <th key={i} className="text-center px-4 py-2.5 text-xs font-semibold text-blue-100">Col. {i + 1}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, ri) => (
-            <tr key={row.key} className="transition-colors"
-              style={{ background: ri % 2 === 0 ? t.rowEven : t.rowOdd, borderBottom: `1px solid ${t.rowBorder}` }}
-              onMouseEnter={e => e.currentTarget.style.background = t.rowHover}
-              onMouseLeave={e => e.currentTarget.style.background = ri % 2 === 0 ? t.rowEven : t.rowOdd}>
-              <td className="px-5 py-3 font-medium text-sm" style={{ color: t.textSub }}>{row.label}</td>
-              {mesures.map((m, i) => (
-                <td key={i} className="px-4 py-3 text-center">
-                  <EditableCell value={m[row.key]} fieldPath={`section_b1.mesures[${i}].${row.key}`} onSave={onSave} />
+              {(row.values && row.values.length > 0 ? row.values : ['']).map((v, ci) => (
+                <td key={ci} className="px-4 py-3 text-center">
+                  <EditableCell
+                    value={v}
+                    fieldPath={`sections[${sectionIndex}].rows[${ri}].values[${ci}]`}
+                    onSave={onSave}
+                    highlight={row.highlight}
+                  />
                 </td>
               ))}
             </tr>
           ))}
-          <tr style={{ background: '#2f5496' }}>
-            <td className="px-5 py-3 font-semibold text-white text-sm">Teneur en eau mesurée (%)</td>
-            {mesures.map((m, i) => (
-              <td key={i} className="px-4 py-3 text-center">
-                <EditableCell value={m.teneur_eau} fieldPath={`section_b1.mesures[${i}].teneur_eau`} onSave={onSave} highlight />
-              </td>
-            ))}
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-export function SectionB2Table({ data, onSave }) {
-  const { t } = useTableTheme()
-  const mesures = data?.mesures || []
-  const rows = [
-    { label: 'N° Tare',                          key: 'tare' },
-    { label: 'Masse de la Tare vide (g)',        key: 'masse_tare' },
-    { label: 'Sol humide + tare (g)',            key: 'sol_humide_tare' },
-    { label: 'Sol sec + tare (g) – 1ère pesée', key: 'sol_sec_1' },
-    { label: 'Sol sec + tare (g) – 2ème pesée', key: 'sol_sec_2' },
-    { label: 'Teneur en eau (%)',                key: 'teneur_eau' },
-  ]
-
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm border-collapse">
-        <thead>
-          <tr>
-            <th colSpan={mesures.length + 1} className="px-5 py-3 text-left text-xs font-bold text-white uppercase tracking-wider" style={SECTION_HEADER}>
-              B-2 — Limite de Plasticité
-            </th>
-          </tr>
-          <tr style={COL_HEADER}>
-            <th className="text-left px-5 py-2.5 text-xs font-semibold text-blue-100 w-72">Paramètre</th>
-            {mesures.map((_, i) => (
-              <th key={i} className="text-center px-4 py-2.5 text-xs font-semibold text-blue-100">Tare {i + 1}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, ri) => (
-            <tr key={row.key} className="transition-colors"
-              style={{ background: ri % 2 === 0 ? t.rowEven : t.rowOdd, borderBottom: `1px solid ${t.rowBorder}` }}
-              onMouseEnter={e => e.currentTarget.style.background = t.rowHover}
-              onMouseLeave={e => e.currentTarget.style.background = ri % 2 === 0 ? t.rowEven : t.rowOdd}>
-              <td className="px-5 py-3 font-medium text-sm" style={{ color: t.textSub }}>{row.label}</td>
-              {mesures.map((m, i) => (
-                <td key={i} className="px-4 py-3 text-center">
-                  <EditableCell value={m[row.key]} fieldPath={`section_b2.mesures[${i}].${row.key}`} onSave={onSave} />
-                </td>
-              ))}
-            </tr>
-          ))}
-          <tr style={{ background: '#2f5496' }}>
-            <td className="px-5 py-3 font-semibold text-white text-sm">Teneur en eau Moyenne (%)</td>
-            <td className="px-4 py-3 text-center font-semibold" colSpan={mesures.length}>
-              <EditableCell value={data?.teneur_eau_moyenne} fieldPath="section_b2.teneur_eau_moyenne" onSave={onSave} highlight />
-            </td>
-          </tr>
         </tbody>
       </table>
     </div>

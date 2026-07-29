@@ -95,7 +95,7 @@ export default function Login() {
           </h2>
 
           <p className="text-slate-400 text-sm leading-relaxed max-w-xs mb-10">
-            Importez vos procès-verbaux Atterberg en PDF. L'IA extrait les données manuscrites et les structure en Excel en quelques secondes.
+            Importez vos procès-verbaux en PDF. Extraction des données manuscrites et structuration en Excel en quelques secondes.
           </p>
 
           {/* Features */}

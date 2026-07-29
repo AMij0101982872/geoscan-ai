@@ -3,7 +3,6 @@ import { getSetting, KEYS } from './settings'
 
 const DARK = '1F2D5C'
 const BLUE = '2F5496'
-const ORANGE = 'FFC000'
 
 const NCOLS = 7
 const col = n => String.fromCharCode(64 + n) // 1→A, 7→G
@@ -28,13 +27,11 @@ function cell(value, { bg, fc = 'FFFFFF', bold = false, halign = 'left', sz = 10
 
 export function exportToExcel(report) {
   const { raw_json: d, filename } = report
-  const meta = d?.meta || {}
-  const tares = d?.section_a?.tares || []
-  const b1 = d?.section_b1?.mesures || []
-  const b2 = d?.section_b2?.mesures || []
+  const meta = Array.isArray(d?.meta) ? d.meta : []
+  const sections = Array.isArray(d?.sections) ? d.sections : []
 
   const labName = getSetting(KEYS.LAB_NAME)
-  const normRef = getSetting(KEYS.NORM_REF) || 'ISO 17892-12'
+  const normRef = getSetting(KEYS.NORM_REF) || d?.reference_norme || ''
 
   const ws = {}
   const merges = []
@@ -56,8 +53,8 @@ export function exportToExcel(report) {
   let r = 1
 
   // ─── TITRE ──────────────────────────────────────────────────────────
-  set(r, 1, `MINUTES - DÉTERMINATION DES LIMITES D'ATTERBERG (${normRef})`,
-    { bg: DARK, bold: true, halign: 'center', sz: 12 })
+  const title = `MINUTES — ${(d?.document_type || 'ESSAI').toUpperCase()}${normRef ? ` (${normRef})` : ''}`
+  set(r, 1, title, { bg: DARK, bold: true, halign: 'center', sz: 12 })
   fillRow(r, { bg: DARK })
   merge(r, 1, r, NCOLS)
   r++
@@ -72,153 +69,59 @@ export function exportToExcel(report) {
 
   r++ // ligne vide
 
-  // ─── EN-TÊTE INFO ───────────────────────────────────────────────────
-  const infoLines = [
-    ["Date de l'essai :", meta.date_essai],
-    ['Opérateur :', meta.operateur],
-    ['Code balances :', meta.code_balances],
-    ['Code étuve :', meta.code_etuve],
-    ['Code appareil Casagrande :', meta.code_casagrande],
-    ['Code échantillon :', meta.code_echantillon],
-  ]
-  infoLines.forEach(([label, value], i) => {
-    set(r, 1, label, { fc: '000000', bold: true })
-    set(r, 2, value || '', { fc: '000000' })
-    merge(r, 2, r, 4)
-    if (i === 0) {
-      set(r, 6, `Ref : ${meta.ref || ''}     Version : ${meta.version || ''}`,
-        { fc: '000000', halign: 'right' })
-      merge(r, 6, r, NCOLS)
+  // ─── EN-TÊTE INFO (générique) ────────────────────────────────────────
+  meta.forEach(m => {
+    set(r, 1, `${m.label} :`, { fc: '000000', bold: true })
+    set(r, 2, m.value || '', { fc: '000000' })
+    merge(r, 2, r, NCOLS)
+    r++
+  })
+
+  if (meta.length > 0) r++ // ligne vide
+
+  // ─── SECTIONS (génériques) ────────────────────────────────────────────
+  sections.forEach(section => {
+    const columns = section.columns || []
+    const rows = section.rows || []
+    const ncols = Math.max(columns.length, ...rows.map(rr => (rr.values || []).length), 1)
+    const displayColumns = columns.length > 0
+      ? columns
+      : (ncols > 1 ? Array.from({ length: ncols }, (_, i) => `Col. ${i + 1}`) : [])
+
+    set(r, 1, section.title || '', { bg: DARK, bold: true, halign: 'center' })
+    fillRow(r, { bg: DARK })
+    merge(r, 1, r, NCOLS)
+    r++
+
+    if (displayColumns.length > 0) {
+      set(r, 1, 'Paramètre', { bg: BLUE, bold: true, halign: 'center' })
+      displayColumns.forEach((c, i) => set(r, 2 + i, c, { bg: BLUE, bold: true, halign: 'center' }))
+      fillRow(r, { bg: BLUE })
+      r++
     }
-    r++
+
+    rows.forEach(row => {
+      const style = row.highlight ? { bg: BLUE, fc: 'FFFFFF', bold: true } : { fc: '000000' }
+      set(r, 1, row.label || '', style)
+      const vals = row.values && row.values.length > 0 ? row.values : ['']
+      vals.forEach((v, i) => set(r, 2 + i, v ?? '', { ...style, halign: 'center' }))
+      fillRow(r, style) // borde les colonnes restantes pour un tableau encadré sur toute sa largeur
+      r++
+    })
+
+    r++ // ligne vide entre sections
   })
-
-  r++ // ligne vide
-
-  // ─── SECTION A ──────────────────────────────────────────────────────
-  set(r, 1, "A - Données pour le calcul de la proportion d'échantillon inférieure à 0,4 mm",
-    { bg: DARK, bold: true, halign: 'center' })
-  fillRow(r, { bg: DARK })
-  merge(r, 1, r, NCOLS)
-  r++
-
-  // En-têtes colonnes A
-  set(r, 1, 'Paramètre', { bg: BLUE, bold: true, halign: 'center' })
-  tares.forEach((_, i) => set(r, 2 + i, `Tare ${i + 1}`, { bg: BLUE, bold: true, halign: 'center' }))
-  fillRow(r, { bg: BLUE })
-  r++
-
-  // Données section A
-  ;[
-    ["N° Tare", tares.map(t => t?.id)],
-    ['Masse de la Tare vide (g)', tares.map(t => t?.masse_tare)],
-    ['Masse sol humide + tare (g)', tares.map(t => t?.sol_humide_tare)],
-    ['Masse Sol sec + tare (g) – 1ère pesée', tares.map(t => t?.sol_sec_1)],
-    ['Masse Sol sec + tare (g) – 2ème pesée', tares.map(t => t?.sol_sec_2)],
-    ["Teneur en eau de l'échantillon original (%)", tares.map(t => t?.teneur_eau)],
-  ].forEach(([label, vals]) => {
-    set(r, 1, label, { fc: '000000' })
-    vals.forEach((v, i) => set(r, 2 + i, v ?? '', { fc: '000000', halign: 'center' }))
-    r++
-  })
-
-  r++ // ligne vide
-
-  // Lignes orange
-  set(r, 1, 'Masse éprouvette non séchée (g)', { fc: '000000', bold: true })
-  set(r, 2, d?.section_a?.masse_eprouvette ?? '', { bg: ORANGE, fc: '000000', bold: true, halign: 'center' })
-  set(r, 3, '', { bg: ORANGE })
-  merge(r, 2, r, 3)
-  r++
-
-  set(r, 1, 'Masse retenue sur tamis 0,400 (g)', { fc: '000000', bold: true })
-  set(r, 2, d?.section_a?.masse_retenue_tamis ?? '', { bg: ORANGE, fc: '000000', bold: true, halign: 'center' })
-  set(r, 3, '', { bg: ORANGE })
-  merge(r, 2, r, 3)
-  r++
-
-  r++ // ligne vide
-
-  // ─── SECTION B1 ─────────────────────────────────────────────────────
-  set(r, 1, 'B-1 - Limite de Liquidité', { bg: DARK, bold: true, halign: 'center' })
-  fillRow(r, { bg: DARK })
-  merge(r, 1, r, NCOLS)
-  r++
-
-  set(r, 1, 'Paramètre', { bg: BLUE, bold: true, halign: 'center' })
-  b1.forEach((_, i) => set(r, 2 + i, `Col. ${i + 1}`, { bg: BLUE, bold: true, halign: 'center' }))
-  fillRow(r, { bg: BLUE })
-  r++
-
-  ;[
-    ['Nombre de rotations', b1.map(m => m?.nb_rotations)],
-    ['N° Tare', b1.map(m => m?.tare)],
-    ['Masse de la Tare vide (g)', b1.map(m => m?.masse_tare)],
-    ['Sol humide + tare (g)', b1.map(m => m?.sol_humide_tare)],
-    ['Sol sec + tare (g) – 1ère pesée', b1.map(m => m?.sol_sec_1)],
-    ['Sol sec + tare (g) – 2ème pesée', b1.map(m => m?.sol_sec_2)],
-  ].forEach(([label, vals]) => {
-    set(r, 1, label, { fc: '000000' })
-    vals.forEach((v, i) => set(r, 2 + i, v ?? '', { fc: '000000', halign: 'center' }))
-    r++
-  })
-
-  // Teneur en eau mesurée (surlignée)
-  set(r, 1, 'Teneur en eau mesurée (%)', { bg: BLUE, bold: true })
-  b1.forEach((m, i) => set(r, 2 + i, m?.teneur_eau ?? '', { bg: BLUE, bold: true, halign: 'center' }))
-  fillRow(r, { bg: BLUE })
-  r++
-
-  r++ // ligne vide
-
-  // ─── SECTION B2 ─────────────────────────────────────────────────────
-  set(r, 1, 'B-2 - Limite de Plasticité', { bg: DARK, bold: true, halign: 'center' })
-  fillRow(r, { bg: DARK })
-  merge(r, 1, r, NCOLS)
-  r++
-
-  set(r, 1, 'Paramètre', { bg: BLUE, bold: true, halign: 'center' })
-  b2.forEach((_, i) => set(r, 2 + i, `Tare ${i + 1}`, { bg: BLUE, bold: true, halign: 'center' }))
-  fillRow(r, { bg: BLUE })
-  r++
-
-  ;[
-    ['N° Tare', b2.map(m => m?.tare)],
-    ['Masse de la Tare vide (g)', b2.map(m => m?.masse_tare)],
-    ['Sol humide + tare (g)', b2.map(m => m?.sol_humide_tare)],
-    ['Sol sec + tare (g) – 1ère pesée', b2.map(m => m?.sol_sec_1)],
-    ['Sol sec + tare (g) – 2ème pesée', b2.map(m => m?.sol_sec_2)],
-    ['Teneur en eau (%)', b2.map(m => m?.teneur_eau)],
-  ].forEach(([label, vals]) => {
-    set(r, 1, label, { fc: '000000' })
-    vals.forEach((v, i) => set(r, 2 + i, v ?? '', { fc: '000000', halign: 'center' }))
-    r++
-  })
-
-  // Teneur en eau Moyenne (surlignée)
-  set(r, 1, 'Teneur en eau Moyenne (%)', { bg: BLUE, bold: true })
-  set(r, 2, d?.section_b2?.teneur_eau_moyenne ?? '', { bg: BLUE, bold: true, halign: 'center' })
-  b2.slice(1).forEach((_, i) => set(r, 3 + i, '', { bg: BLUE }))
-  fillRow(r, { bg: BLUE })
-  r++
 
   // ─── PARAMÈTRES FEUILLE ─────────────────────────────────────────────
-  ws['!ref'] = `A1:${col(NCOLS)}${r}`
+  ws['!ref'] = `A1:${col(NCOLS)}${Math.max(r - 1, 1)}`
   ws['!merges'] = merges
-  ws['!cols'] = [
-    { wch: 46 },
-    { wch: 13 },
-    { wch: 13 },
-    { wch: 13 },
-    { wch: 13 },
-    { wch: 13 },
-    { wch: 13 },
-  ]
+  ws['!cols'] = Array.from({ length: NCOLS }, (_, i) => ({ wch: i === 0 ? 46 : 13 }))
   ws['!rows'] = [{ hpt: 32 }]
 
   const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, ws, 'Atterberg')
+  const sheetName = (d?.document_type || 'Rapport').slice(0, 31)
+  XLSX.utils.book_append_sheet(wb, ws, sheetName)
 
   const safeName = (filename || 'rapport').replace('.pdf', '')
-  XLSX.writeFile(wb, `${safeName}_atterberg.xlsx`)
+  XLSX.writeFile(wb, `${safeName}_extraction.xlsx`)
 }
