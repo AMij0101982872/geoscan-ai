@@ -110,6 +110,10 @@ export default function Dashboard({ session }) {
   }
 
   async function deleteReport(id) {
+    const report = reports.find(r => r.id === id)
+    if (report?.pdf_path) {
+      await supabase.storage.from('pdfs').remove([report.pdf_path])
+    }
     await supabase.from('reports').delete().eq('id', id)
     setReports(r => r.filter(x => x.id !== id))
     setConfirmDelete(null)

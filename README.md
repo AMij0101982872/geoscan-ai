@@ -4,7 +4,7 @@ Extraction automatique de données géotechniques manuscrites — PDF vers Excel
 
 > Dépose un procès-verbal Atterberg (ISO 17892-12) manuscrit, l'IA lit les données, tu valides, tu exportes en Excel formaté.
 
-**Live :** [geoscan-ai-sage.vercel.app](https://geoscan-ai-sage.vercel.app) &nbsp;·&nbsp; **Repo :** [github.com/AMij0101982872/geoscan-ai](https://github.com/AMij0101982872/geoscan-ai)
+**Live :** [geoscanai.netlify.app](https://geoscanai.netlify.app) &nbsp;·&nbsp; **Repo :** [github.com/AMij0101982872/geoscan-ai](https://github.com/AMij0101982872/geoscan-ai)
 
 ---
 
@@ -27,7 +27,7 @@ Extraction automatique de données géotechniques manuscrites — PDF vers Excel
 | Couche | Technologie |
 |--------|------------|
 | Frontend | React 18 + Vite + TailwindCSS |
-| Hébergement | Vercel (Hobby — gratuit) |
+| Hébergement | Netlify |
 | Base de données | Supabase (PostgreSQL + Storage + Auth) |
 | IA | Google Gemini API (`gemini-2.0-flash`, fallback cascade) |
 | Export | xlsx-js-style |
@@ -65,7 +65,7 @@ VITE_SUPABASE_ANON_KEY=eyJ...
 VITE_GEMINI_API_KEY=AIzaSy...
 ```
 
-Les mêmes variables doivent être déclarées dans **Vercel → Settings → Environment Variables**.
+Les mêmes variables doivent être déclarées dans **Netlify → Project configuration → Environment variables** (ne pas cocher "Contains secret values" — ces clés doivent être intégrées au bundle client par Vite).
 
 ---
 
@@ -118,14 +118,18 @@ create policy "Users access own pdfs" on storage.objects for all
 
 ---
 
-## Déploiement Vercel
+## Déploiement Netlify
 
-1. Importer le repo sur [vercel.com](https://vercel.com)
-2. Ajouter les variables d'environnement dans **Settings → Environment Variables** :
+1. Sur [app.netlify.com](https://app.netlify.com), **Add new project → Import an existing project** et connecter le repo GitHub
+2. Netlify détecte automatiquement `netlify.toml` :
+   - Build command : `npm run build`
+   - Publish directory : `dist`
+3. Ajouter les variables d'environnement dans **Project configuration → Environment variables** :
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
    - `VITE_GEMINI_API_KEY`
-3. Déployer — **plan Hobby (gratuit) suffisant**, aucune fonction serverless utilisée
+4. Passer le projet en **Public** (Project overview → "Make public"), sinon il reste accessible uniquement aux membres de l'équipe Netlify
+5. Déployer — le plan **Free** suffit (usage commercial autorisé par Netlify, contrairement au plan Hobby de Vercel)
 
 ---
 
@@ -150,8 +154,9 @@ geoscan-ai/
 │       ├── exportExcel.js   # Génération fichier Excel formaté
 │       ├── theme.jsx        # ThemeContext (clair/sombre, localStorage)
 │       └── settings.js      # Préférences utilisateur (localStorage)
-└── api/
-    └── extract.js           # Conservé pour référence (non utilisé en prod)
+└── api/                      # Fonctions serverless Vercel — conservées pour référence, non utilisées (hébergement Netlify)
+    ├── extract.js
+    └── reports.js
 ```
 
 ---
@@ -180,15 +185,19 @@ Export Excel (.xlsx) formaté
 
 ---
 
-## Plan tarifaire — 100% gratuit pour 5 utilisateurs
+## Plan tarifaire — 10 utilisateurs
 
-| Service | Plan | Limite | Usage estimé |
-|---------|------|--------|--------------|
-| Vercel | Hobby (gratuit) | — | Hébergement statique uniquement |
-| Gemini API | Free | 1 500 req/jour | ~50–100/jour |
-| Supabase DB | Free | 500 MB | < 10 MB |
-| Supabase Storage | Free | 1 GB | ~500 MB (PDFs) |
-| Supabase Auth | Free | 50 000 MAU | 5 utilisateurs |
+Avec ~10 utilisateurs actifs et un volume d'extractions élevé (15+/jour/utilisateur), le free tier ne suffit plus partout :
+
+| Service | Plan | Coût estimé |
+|---------|------|--------------|
+| Netlify | Free | 0$/mois (usage commercial autorisé) |
+| Supabase | Pro | ~25$/mois (évite la mise en pause après 7 jours d'inactivité) |
+| Gemini API | Pay-as-you-go au-delà du quota gratuit | ~5–15$/mois |
+| Nom de domaine (optionnel) | — | ~1$/mois |
+| **Total** | | **~30–40$/mois** |
+
+> Le plan Supabase Free suffit pour des tests/une démo, mais il **met le projet en pause après 7 jours d'inactivité** — d'où le passage en Pro pour un usage en production.
 
 ---
 
