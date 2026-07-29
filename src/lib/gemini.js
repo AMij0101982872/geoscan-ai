@@ -8,7 +8,10 @@ const MODELS = [
 const PROMPT = `Tu es un expert en extraction de données de documents géotechniques manuscrits.
 Analyse ce procès-verbal de détermination des Limites d'Atterberg (ISO 17892-12).
 
-Extrait TOUTES les valeurs visibles dans le document, même si l'écriture est difficile à lire.
+Si le document fourni n'est manifestement PAS un procès-verbal de Limites d'Atterberg (mauvais type de document, contenu sans rapport, page blanche, illisible en totalité), réponds UNIQUEMENT avec cet objet JSON, sans rien d'autre :
+{"error": "document_non_conforme"}
+
+Sinon, extrait TOUTES les valeurs visibles dans le document, même si l'écriture est difficile à lire.
 Pour les valeurs ambiguës, indique ton meilleur choix (ex: 4,455 et non 4,457 si le chiffre ressemble plus à un 5).
 
 Réponds UNIQUEMENT avec un objet JSON valide, sans markdown, sans backticks, sans explication.
@@ -119,7 +122,19 @@ export async function extractFromPdf(file) {
     const match = rawText.match(/\{[\s\S]*\}/)
     if (!match) throw new Error('Aucun JSON trouvé dans la réponse Gemini')
 
-    return JSON.parse(match[0])
+    const parsed = JSON.parse(match[0])
+    if (parsed.error === 'document_non_conforme') {
+      throw new Error("Ce document ne semble pas être un procès-verbal de Limites d'Atterberg. Vérifiez le fichier et réessayez.")
+    }
+
+    const hasTares = (parsed.section_a?.tares?.length ?? 0) > 0
+    const hasB1 = (parsed.section_b1?.mesures?.length ?? 0) > 0
+    const hasB2 = (parsed.section_b2?.mesures?.length ?? 0) > 0
+    if (!hasTares && !hasB1 && !hasB2) {
+      throw new Error("Aucune donnée exploitable trouvée dans ce document. Vérifiez qu'il s'agit bien d'un procès-verbal de Limites d'Atterberg.")
+    }
+
+    return parsed
   }
 
   throw new Error(`Tous les modèles Gemini sont indisponibles. Dernier: ${lastError}`)
