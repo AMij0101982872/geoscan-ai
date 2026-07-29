@@ -5,70 +5,42 @@ const MODELS = [
   'gemini-2.5-flash',
 ]
 
-const PROMPT = `Tu es un expert en extraction de données de documents géotechniques manuscrits.
-Analyse ce procès-verbal de détermination des Limites d'Atterberg (ISO 17892-12).
+const PROMPT = `Tu es un expert en extraction de données de procès-verbaux d'essais géotechniques et de laboratoire manuscrits (Atterberg, granulométrie, extraction de bitume, compactage, etc. — tout type de PV d'essai).
 
-Si le document fourni n'est manifestement PAS un procès-verbal de Limites d'Atterberg (mauvais type de document, contenu sans rapport, page blanche, illisible en totalité), réponds UNIQUEMENT avec cet objet JSON, sans rien d'autre :
+Identifie d'abord le type de document et sa référence normative si elle est visible (ex: ISO 17892-12, NF EN 12697-1).
+
+Si le document fourni n'est manifestement PAS un procès-verbal d'essai de laboratoire exploitable (mauvais type de fichier, contenu sans rapport, page blanche, totalement illisible), réponds UNIQUEMENT avec cet objet JSON, sans rien d'autre :
 {"error": "document_non_conforme"}
 
 Sinon, extrait TOUTES les valeurs visibles dans le document, même si l'écriture est difficile à lire.
 Pour les valeurs ambiguës, indique ton meilleur choix (ex: 4,455 et non 4,457 si le chiffre ressemble plus à un 5).
 
-Réponds UNIQUEMENT avec un objet JSON valide, sans markdown, sans backticks, sans explication.
+Réponds UNIQUEMENT avec un objet JSON valide, sans markdown, sans backticks, sans explication, respectant EXACTEMENT cette structure :
 
-Structure exacte attendue :
 {
-  "meta": {
-    "date_essai": "",
-    "operateur": "",
-    "code_balances": "",
-    "code_etuve": "",
-    "code_casagrande": "",
-    "code_echantillon": "",
-    "ref": "",
-    "version": ""
-  },
-  "section_a": {
-    "tares": [
-      {
-        "id": "",
-        "masse_tare": 0,
-        "sol_humide_tare": 0,
-        "sol_sec_1": 0,
-        "sol_sec_2": 0,
-        "teneur_eau": null
-      }
-    ],
-    "masse_eprouvette": 0,
-    "masse_retenue_tamis": 0
-  },
-  "section_b1": {
-    "mesures": [
-      {
-        "nb_rotations": 0,
-        "tare": "",
-        "masse_tare": 0,
-        "sol_humide_tare": 0,
-        "sol_sec_1": 0,
-        "sol_sec_2": 0,
-        "teneur_eau": 0
-      }
-    ]
-  },
-  "section_b2": {
-    "mesures": [
-      {
-        "tare": "",
-        "masse_tare": 0,
-        "sol_humide_tare": 0,
-        "sol_sec_1": 0,
-        "sol_sec_2": 0,
-        "teneur_eau": 0
-      }
-    ],
-    "teneur_eau_moyenne": 0
-  }
-}`
+  "document_type": "Nom du type de document identifié (ex: Limites d'Atterberg, Extraction de Bitume, Analyse granulométrique par tamisage)",
+  "reference_norme": "Référence normative si visible, sinon chaîne vide",
+  "meta": [
+    { "label": "Nom du champ d'en-tête tel qu'il apparaît (ex: Date de l'essai, Opérateur, Code échantillon...)", "value": "valeur lue" }
+  ],
+  "sections": [
+    {
+      "title": "Titre du tableau/section tel qu'il apparaît dans le document",
+      "columns": ["Nom colonne 1", "Nom colonne 2"],
+      "rows": [
+        { "label": "Nom du paramètre/ligne", "values": ["valeur col 1", "valeur col 2"], "highlight": false }
+      ]
+    }
+  ]
+}
+
+Règles :
+- "meta" contient les informations d'en-tête générales du document (dates, opérateur, codes d'appareils, références, versions...), jamais les données de mesure.
+- "sections" contient un objet par tableau de données/mesures présent dans le document, dans l'ordre où ils apparaissent.
+- "columns" correspond aux colonnes du tableau (ex: numéros de tare, numéros d'essai). Si le tableau n'a qu'une seule colonne de valeurs (pas de répétition), mets un tableau vide [].
+- Chaque "values" doit avoir autant d'éléments que "columns" (ou un seul élément si "columns" est vide).
+- Mets "highlight": true uniquement sur les lignes de résultat final mises en évidence dans le document (ex: teneur en eau retenue, résultat surligné ou encadré).
+- Utilise des chaînes vides "" pour les valeurs illisibles ou absentes, jamais null ni de texte explicatif.`
 
 async function fileToBase64(file) {
   const buffer = await file.arrayBuffer()
@@ -127,11 +99,11 @@ export async function extractFromPdf(file) {
       throw new Error("Ce document ne semble pas être un procès-verbal de Limites d'Atterberg. Vérifiez le fichier et réessayez.")
     }
 
-    const hasTares = (parsed.section_a?.tares?.length ?? 0) > 0
-    const hasB1 = (parsed.section_b1?.mesures?.length ?? 0) > 0
-    const hasB2 = (parsed.section_b2?.mesures?.length ?? 0) > 0
-    if (!hasTares && !hasB1 && !hasB2) {
-      throw new Error("Aucune donnée exploitable trouvée dans ce document. Vérifiez qu'il s'agit bien d'un procès-verbal de Limites d'Atterberg.")
+    const hasData = (parsed.sections || []).some(
+      s => (s.rows || []).some(row => (row.values || []).some(v => v !== '' && v != null))
+    )
+    if (!hasData) {
+      throw new Error("Aucune donnée exploitable trouvée dans ce document. Vérifiez qu'il s'agit bien d'un procès-verbal d'essai de laboratoire.")
     }
 
     return parsed
