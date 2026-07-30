@@ -26,9 +26,11 @@ Réponds UNIQUEMENT avec un objet JSON valide, sans markdown, sans backticks, sa
   "sections": [
     {
       "title": "Titre du tableau/section tel qu'il apparaît dans le document",
-      "columns": ["Nom colonne 1", "Nom colonne 2"],
+      "row_group": 0,
+      "column_groups": [ { "label": "Nom d'en-tête groupé au-dessus de plusieurs colonnes (ex: TAMIS)", "span": 2 } ],
+      "columns": ["Nom colonne 1", "Nom colonne 2", "Nom colonne 3"],
       "rows": [
-        { "label": "Nom du paramètre/ligne", "values": ["valeur col 1", "valeur col 2"], "highlight": false }
+        { "values": ["valeur col 1", "valeur col 2", "valeur col 3"], "highlight": false }
       ]
     }
   ]
@@ -37,10 +39,20 @@ Réponds UNIQUEMENT avec un objet JSON valide, sans markdown, sans backticks, sa
 Règles :
 - "meta" contient les informations d'en-tête générales du document (dates, opérateur, codes d'appareils, références, versions...), jamais les données de mesure.
 - "sections" contient un objet par tableau de données/mesures présent dans le document, dans l'ordre où ils apparaissent.
-- "columns" correspond aux colonnes du tableau (ex: numéros de tare, numéros d'essai). Si le tableau n'a qu'une seule colonne de valeurs (pas de répétition), mets un tableau vide [].
-- Chaque "values" doit avoir autant d'éléments que "columns" (ou un seul élément si "columns" est vide).
+- N'inclus JAMAIS le bandeau de titre général du document (le nom du document, son type, sa référence — déjà capturés dans "document_type"/"reference_norme"/"meta") comme une section. Ce n'est pas un tableau de données.
+- N'inclus JAMAIS les zones de signature, cachet, nom et date du responsable/opérateur en bas de page comme une section — ce n'est pas un tableau de données, ignore complètement ce texte.
+- Chaque section a SES PROPRES colonnes, déterminées uniquement par ce qui est imprimé pour CE tableau précis. Ne réutilise ni ne copie JAMAIS les colonnes d'un autre tableau voisin, même s'ils se ressemblent ou sont proches sur la page.
+- "row_group" : entier indiquant la position verticale du tableau sur la page. Deux tableaux placés CÔTE À CÔTE sur la même page (comme une liste à gauche et un tableau à droite) doivent avoir le MÊME "row_group". Un tableau placé plus bas sur la page a un "row_group" supérieur. Numérote à partir de 0, dans l'ordre d'apparition de haut en bas.
+- Ne crée JAMAIS de section pour un simple titre/intitulé général qui chapeaute plusieurs tableaux en dessous de lui (ex: un titre "B - Détermination de la limite de liquidité et de plasticité" au-dessus de deux tableaux "B-1" et "B-2") : intègre ce texte dans le "title" du premier tableau qui suit, ne crée pas d'entrée "sections" séparée pour lui. Une section ne doit exister que si elle contient réellement des "rows" de données.
+- "column_groups" est optionnel : uniquement si le tableau a un double niveau d'en-têtes (une colonne-titre qui chapeaute plusieurs sous-colonnes, ex: "TAMIS" au-dessus de "Code tamis" et "Diamètre"). "span" = nombre de sous-colonnes couvertes. Omets ce champ ou laisse un tableau vide s'il n'y a qu'un seul niveau d'en-têtes.
+- "columns" est la liste COMPLÈTE et RÉELLE des colonnes du tableau, dans l'ordre, avec le texte exact imprimé dans le document — y COMPRIS la toute première colonne, même si c'est une colonne d'identification comme "Code de tamis utilisé" ou "N° Tare". Ne saute JAMAIS de colonne réelle. N'invente JAMAIS de colonne "Paramètre" — si la première colonne n'a pas d'intitulé imprimé mais sert clairement à nommer chaque ligne (ex: les tableaux avec "Masse de la Tare vide (g)", "Sol humide + tare (g)"... en première colonne), utilise "Paramètre" comme texte de cet en-tête, car c'est bien une vraie colonne du tableau — mais s'il y a déjà une vraie colonne de données en première position (comme "Code de tamis utilisé"), c'est CETTE colonne-là, pas "Paramètre".
+- Chaque "values" doit avoir EXACTEMENT autant d'éléments que "columns", dans le même ordre. Ne décale jamais une valeur vers la mauvaise colonne.
+- Cas des tableaux "Paramètre + plusieurs instances" (ex: plusieurs tares côte à côte, sans en-tête imprimé au-dessus de chaque instance) : utilise "Paramètre" pour la première colonne, puis des numéros séquentiels simples ("1", "2", "3"...) pour les colonnes suivantes — jamais une valeur issue d'une ligne de données (comme un numéro de tare ou un nombre de rotations). La ligne qui identifie chaque instance (ex: "N° Tare") reste une ligne normale dans "rows", jamais transformée en en-tête.
 - Mets "highlight": true uniquement sur les lignes de résultat final mises en évidence dans le document (ex: teneur en eau retenue, résultat surligné ou encadré).
-- Utilise des chaînes vides "" pour les valeurs illisibles ou absentes, jamais null ni de texte explicatif.`
+- Utilise des chaînes vides "" pour les valeurs illisibles ou absentes, jamais null ni de texte explicatif.
+
+ATTENTION — erreur fréquente à éviter absolument :
+Quand plusieurs tableaux distincts sont placés côte à côte ou l'un au-dessus de l'autre sur la même page, ce sont des sections INDÉPENDANTES, même s'ils sont alignés visuellement à la même hauteur. Ne prends JAMAIS une valeur d'un tableau parce qu'elle se trouve sur la même ligne horizontale qu'une ligne d'un autre tableau — regarde uniquement la ligne et la colonne réelles À L'INTÉRIEUR de chaque tableau pris séparément. Avant de finaliser ta réponse, vérifie pour chaque valeur qu'elle appartient bien au bon tableau, à la bonne ligne et à la bonne colonne de CE tableau précis.`
 
 async function fileToBase64(file) {
   const buffer = await file.arrayBuffer()

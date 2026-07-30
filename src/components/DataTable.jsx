@@ -64,25 +64,22 @@ export function SectionTable({ section, sectionIndex, onSave }) {
   const ncols = Math.max(columns.length, ...rows.map(r => (r.values || []).length), 1)
   const displayColumns = columns.length > 0
     ? columns
-    : (ncols > 1 ? Array.from({ length: ncols }, (_, i) => `Col. ${i + 1}`) : [])
+    : Array.from({ length: ncols }, (_, i) => `Col. ${i + 1}`)
 
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm border-collapse">
         <thead>
           <tr>
-            <th colSpan={ncols + 1} className="px-5 py-3 text-left text-xs font-bold text-white uppercase tracking-wider" style={SECTION_HEADER}>
+            <th colSpan={ncols} className="px-5 py-3 text-left text-xs font-bold text-white uppercase tracking-wider" style={SECTION_HEADER}>
               {section?.title || `Section ${sectionIndex + 1}`}
             </th>
           </tr>
-          {displayColumns.length > 0 && (
-            <tr style={COL_HEADER}>
-              <th className="text-left px-5 py-2.5 text-xs font-semibold text-blue-100 w-72">Paramètre</th>
-              {displayColumns.map((c, i) => (
-                <th key={i} className="text-center px-4 py-2.5 text-xs font-semibold text-blue-100">{c}</th>
-              ))}
-            </tr>
-          )}
+          <tr style={COL_HEADER}>
+            {displayColumns.map((c, i) => (
+              <th key={i} className="text-center first:text-left px-5 py-2.5 text-xs font-semibold text-blue-100 first:w-72">{c}</th>
+            ))}
+          </tr>
         </thead>
         <tbody>
           {rows.map((row, ri) => (
@@ -92,12 +89,8 @@ export function SectionTable({ section, sectionIndex, onSave }) {
                 : { background: ri % 2 === 0 ? t.rowEven : t.rowOdd, borderBottom: `1px solid ${t.rowBorder}` }}
               onMouseEnter={e => { if (!row.highlight) e.currentTarget.style.background = t.rowHover }}
               onMouseLeave={e => { if (!row.highlight) e.currentTarget.style.background = ri % 2 === 0 ? t.rowEven : t.rowOdd }}>
-              <td className="px-5 py-3 font-medium text-sm"
-                style={{ color: row.highlight ? '#ffffff' : t.textSub, fontWeight: row.highlight ? 600 : 500 }}>
-                {row.label}
-              </td>
-              {(row.values && row.values.length > 0 ? row.values : ['']).map((v, ci) => (
-                <td key={ci} className="px-4 py-3 text-center">
+              {(row.values && row.values.length > 0 ? row.values : Array(ncols).fill('')).map((v, ci) => (
+                <td key={ci} className={ci === 0 ? 'px-5 py-3' : 'px-4 py-3 text-center'}>
                   <EditableCell
                     value={v}
                     fieldPath={`sections[${sectionIndex}].rows[${ri}].values[${ci}]`}
