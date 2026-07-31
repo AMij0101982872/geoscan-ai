@@ -75,14 +75,6 @@ const TABS = [
     ),
   },
   {
-    id: 'export', label: 'Export Excel', desc: 'En-tête des fichiers exportés',
-    icon: (
-      <svg style={{ width: '16px', height: '16px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-      </svg>
-    ),
-  },
-  {
     id: 'securite', label: 'Sécurité', desc: 'Mot de passe de connexion',
     icon: (
       <svg style={{ width: '16px', height: '16px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -109,11 +101,6 @@ export default function Settings({ session }) {
   const [displayName, setDisplayName] = useState(() => getSetting(KEYS.DISPLAY_NAME))
   const [profileSaved, setProfileSaved] = useState(false)
 
-  // Export
-  const [labName, setLabName] = useState(() => getSetting(KEYS.LAB_NAME))
-  const [normRef, setNormRef] = useState(() => getSetting(KEYS.NORM_REF))
-  const [exportSaved, setExportSaved] = useState(false)
-
   // Mot de passe
   const [newPass, setNewPass] = useState('')
   const [confirmPass, setConfirmPass] = useState('')
@@ -137,11 +124,6 @@ export default function Settings({ session }) {
   function saveProfile() {
     setSetting(KEYS.DISPLAY_NAME, displayName)
     setProfileSaved(true); setTimeout(() => setProfileSaved(false), 2500)
-  }
-
-  function saveExport() {
-    setSetting(KEYS.LAB_NAME, labName); setSetting(KEYS.NORM_REF, normRef)
-    setExportSaved(true); setTimeout(() => setExportSaved(false), 2500)
   }
 
   async function changePassword() {
@@ -297,32 +279,6 @@ export default function Settings({ session }) {
               </button>
             )
           })}
-        </div>
-      </>
-    ),
-
-    export: (
-      <>
-        <SecHeader tabId="export" />
-        <Field label="Nom du laboratoire / organisme" hint="Affiché sous le titre principal dans le fichier Excel exporté">
-          <input value={labName} onChange={e => setLabName(e.target.value)} placeholder="Ex : Laboratoire de Géotechnique du Maroc"
-            style={inp()} onFocus={e => e.target.style.borderColor = '#4f6ef7'} onBlur={e => e.target.style.borderColor = t.divider} />
-        </Field>
-        <Field label="Référence norme" hint={'Intégrée dans le titre : "MINUTES — DÉTERMINATION DES LIMITES D\'ATTERBERG (…)"'}>
-          <input value={normRef} onChange={e => setNormRef(e.target.value)} placeholder="ISO 17892-12"
-            style={inp()} onFocus={e => e.target.style.borderColor = '#4f6ef7'} onBlur={e => e.target.style.borderColor = t.divider} />
-        </Field>
-        {/* Live preview */}
-        <div style={{ padding: '14px 16px', borderRadius: '10px', marginBottom: '20px', background: isDark ? 'rgba(79,110,247,0.06)' : 'rgba(79,110,247,0.04)', border: `1px solid ${isDark ? 'rgba(79,110,247,0.15)' : 'rgba(79,110,247,0.12)'}` }}>
-          <p style={{ fontSize: '11px', fontWeight: 700, color: '#4f6ef7', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 8px' }}>Aperçu du titre Excel</p>
-          <p style={{ fontSize: '13px', color: t.textSub, margin: 0, fontFamily: 'monospace', lineHeight: '1.5' }}>
-            MINUTES — DÉTERMINATION DES LIMITES D'ATTERBERG ({normRef || 'ISO 17892-12'})
-          </p>
-          {labName && <p style={{ fontSize: '12px', color: t.textMuted, margin: '4px 0 0', fontFamily: 'monospace' }}>{labName}</p>}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <button onClick={saveExport} className="btn-primary">Sauvegarder</button>
-          <SavedBadge show={exportSaved} />
         </div>
       </>
     ),
