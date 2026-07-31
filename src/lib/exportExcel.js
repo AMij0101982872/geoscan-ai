@@ -50,74 +50,128 @@ export function exportToExcel(report) {
     merges.push({ s: { r: r1 - 1, c: c1 - 1 }, e: { r: r2 - 1, c: c2 - 1 } })
   }
 
-  const totalWidth = Math.max(
-    1,
-    ...tableaux.map(tb => Math.max((tb.colonnes || []).length, ...(tb.lignes || []).map(l => (l || []).length), 1))
+  // Bordure épaisse tout autour d'un bloc (titre + colonnes + lignes) pour
+  // qu'il se détache visuellement comme un cadre distinct, comme sur le PDF
+  // source — sans toucher aux fines bordures internes entre cellules.
+  const THICK = { style: 'medium', color: { rgb: '1F2D5C' } }
+  function frame(r1, c1, r2, c2) {
+    for (let c = c1; c <= c2; c++) {
+      const top = ws[`${col(c)}${r1}`]
+      if (top) top.s.border.top = THICK
+      const bottom = ws[`${col(c)}${r2}`]
+      if (bottom) bottom.s.border.bottom = THICK
+    }
+    for (let rr = r1; rr <= r2; rr++) {
+      const left = ws[`${col(c1)}${rr}`]
+      if (left) left.s.border.left = THICK
+      const right = ws[`${col(c2)}${rr}`]
+      if (right) right.s.border.right = THICK
+    }
+  }
+
+  // Chaque tableau garde sa propre largeur ; ils seront placés côte à côte,
+  // collés les uns aux autres (comme un seul bloc continu sur le document
+  // source), séparés uniquement par une bordure fine, pas par un espace.
+  const tableauWidths = tableaux.map(tb =>
+    Math.max((tb.colonnes || []).length, ...(tb.lignes || []).map(l => (l || []).length), 1)
   )
+  const tableauxWidth = Math.max(1, tableauWidths.reduce((sum, w) => sum + w, 0))
+  // Les champs s'affichent 2 par ligne (label/valeur/label/valeur), comme
+  // sur le document source — nécessite au moins 4 colonnes.
+  const sheetWidth = Math.max(tableauxWidth, champs.length > 0 ? 4 : 1)
 
   let r = 1
 
   // ─── TITRE ──────────────────────────────────────────────────────────
   const title = `MINUTES — ${(d?.type_document || 'ESSAI').toUpperCase()}${normRef ? ` (${normRef})` : ''}`
   set(r, 1, title, { bg: DARK, bold: true, halign: 'center', sz: 12 })
-  fillRange(r, 1, totalWidth, { bg: DARK })
-  merge(r, 1, r, totalWidth)
+  fillRange(r, 1, sheetWidth, { bg: DARK })
+  merge(r, 1, r, sheetWidth)
   r++
 
   if (labName) {
     set(r, 1, labName, { bg: DARK, halign: 'center', sz: 10, fc: 'A0AEC0' })
-    fillRange(r, 1, totalWidth, { bg: DARK })
-    merge(r, 1, r, totalWidth)
+    fillRange(r, 1, sheetWidth, { bg: DARK })
+    merge(r, 1, r, sheetWidth)
     r++
   }
 
   r++ // ligne vide
 
-  // ─── CHAMPS D'EN-TÊTE ─────────────────────────────────────────────────
-  champs.forEach(f => {
-    set(r, 1, `${f.label} :`, { fc: '000000', bold: true })
-    set(r, 2, f.valeur ?? '', { fc: '000000' })
-    merge(r, 2, r, totalWidth)
+  // ─── CHAMPS D'EN-TÊTE (2 par ligne) ─────────────────────────────────────
+  const champsStartRow = r
+  for (let i = 0; i < champs.length; i += 2) {
+    const f1 = champs[i]
+    const f2 = champs[i + 1]
+    set(r, 1, `${f1.label} :`, { fc: '000000', bold: true })
+    set(r, 2, f1.valeur ?? '', { fc: '000000' })
+    if (f2) {
+      set(r, 3, `${f2.label} :`, { fc: '000000', bold: true })
+      set(r, 4, f2.valeur ?? '', { fc: '000000' })
+      if (sheetWidth > 4) merge(r, 4, r, sheetWidth)
+    } else {
+      merge(r, 2, r, sheetWidth)
+    }
     r++
-  })
+  }
+  if (champs.length > 0) frame(champsStartRow, 1, r - 1, sheetWidth)
 
   if (champs.length > 0) r++ // ligne vide
 
-  // ─── TABLEAUX (empilés verticalement) ─────────────────────────────────
-  tableaux.forEach(tb => {
+  // ─── TABLEAUX (côte à côte, comme sur le document source) ──────────────
+  const tableauxStartRow = r
+  let colOffset = 1
+  let maxRowReached = r
+
+  tableaux.forEach((tb, ti) => {
     const colonnes = tb.colonnes || []
     const lignes = tb.lignes || []
-    const width = Math.max(colonnes.length, ...lignes.map(l => (l || []).length), 1)
+    const width = tableauWidths[ti]
+    let tr = tableauxStartRow
 
     if (tb.titre) {
-      set(r, 1, tb.titre, { bg: DARK, bold: true, halign: 'center' })
-      fillRange(r, 1, width, { bg: DARK })
-      merge(r, 1, r, width)
-      r++
+      set(tr, colOffset, tb.titre, { bg: DARK, bold: true, halign: 'center' })
+      fillRange(tr, colOffset, colOffset + width - 1, { bg: DARK })
+      merge(tr, colOffset, tr, colOffset + width - 1)
+      tr++
     }
 
     const displayColumns = colonnes.length > 0
       ? colonnes
       : Array.from({ length: width }, (_, i) => `Col. ${i + 1}`)
-    displayColumns.forEach((c, i) => set(r, 1 + i, c, { bg: BLUE, bold: true, halign: 'center' }))
-    fillRange(r, 1, width, { bg: BLUE })
-    r++
+    displayColumns.forEach((c, i) => set(tr, colOffset + i, c, { bg: BLUE, bold: true, halign: 'center' }))
+    fillRange(tr, colOffset, colOffset + width - 1, { bg: BLUE })
+    tr++
 
     lignes.forEach(ligne => {
       const vals = ligne && ligne.length > 0 ? ligne : Array(width).fill('')
-      vals.forEach((v, i) => set(r, 1 + i, v ?? '', { fc: '000000', halign: i === 0 ? 'left' : 'center' }))
-      fillRange(r, 1, width, { fc: '000000' })
-      r++
+      vals.forEach((v, i) => set(tr, colOffset + i, v ?? '', { fc: '000000', halign: i === 0 ? 'left' : 'center' }))
+      fillRange(tr, colOffset, colOffset + width - 1, { fc: '000000' })
+      tr++
     })
 
-    r++ // ligne vide entre tableaux
+    // Bordure verticale fine entre deux tableaux voisins (pas de cadre
+    // individuel ni d'espace : ça doit rester un seul bloc visuel continu)
+    if (ti > 0) {
+      for (let rr = tableauxStartRow; rr < tr; rr++) {
+        const first = ws[`${col(colOffset)}${rr}`]
+        if (first) first.s.border.left = { style: 'thin', color: { rgb: '888888' } }
+      }
+    }
+
+    maxRowReached = Math.max(maxRowReached, tr)
+    colOffset += width
   })
+
+  frame(tableauxStartRow, 1, maxRowReached - 1, tableauxWidth)
+  r = maxRowReached
 
   // ─── PARAMÈTRES FEUILLE ─────────────────────────────────────────────
   const lastRow = Math.max(r - 1, 1)
-  ws['!ref'] = `A1:${col(totalWidth)}${lastRow}`
+  const finalWidth = Math.max(sheetWidth, tableauxWidth)
+  ws['!ref'] = `A1:${col(finalWidth)}${lastRow}`
   ws['!merges'] = merges
-  ws['!cols'] = Array.from({ length: totalWidth }, (_, i) => ({ wch: i === 0 ? 32 : 16 }))
+  ws['!cols'] = Array.from({ length: finalWidth }, (_, i) => ({ wch: i === 0 ? 32 : 16 }))
   ws['!rows'] = [{ hpt: 32 }]
 
   const wb = XLSX.utils.book_new()

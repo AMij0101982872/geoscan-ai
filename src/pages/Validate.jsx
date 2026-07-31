@@ -86,7 +86,7 @@ export default function Validate() {
       {/* Sticky top bar */}
       <div className="sticky top-0 z-10 backdrop-blur-md"
         style={{ background: t.topbar, borderBottom: `1px solid ${t.topbarBorder}`, boxShadow: isDark ? 'none' : '0 1px 4px rgba(0,0,0,0.06)' }}>
-        <div className="max-w-5xl mx-auto px-8 h-16 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
               onClick={() => navigate('/')}
@@ -155,7 +155,7 @@ export default function Validate() {
       </div>
 
       {/* Content */}
-      <div className="max-w-5xl mx-auto px-8 py-7 space-y-4">
+      <div className="max-w-7xl mx-auto px-8 py-7 space-y-4">
 
         {/* Meta card */}
         {champs.length > 0 && (
@@ -199,12 +199,20 @@ export default function Validate() {
           Cliquez sur n'importe quelle cellule de donnée pour la modifier. Sauvegardez quand vous avez terminé.
         </div>
 
-        {/* Tableaux */}
-        {tableaux.map((tb, i) => (
-          <div key={i} style={CARD}>
-            <SectionTable section={tb} sectionIndex={i} onSave={handleCellSave} />
+        {/* Tableaux — un seul bloc continu (comme sur le document source),
+            les tableaux voisins sont collés, séparés par une simple ligne
+            verticale plutôt que par un espace entre deux cartes distinctes */}
+        {tableaux.length > 0 && (
+          <div style={CARD}>
+            <div className="flex flex-wrap items-stretch">
+              {tableaux.map((tb, i) => (
+                <div key={i} style={{ flex: '1 1 380px', minWidth: '320px', borderLeft: i > 0 ? `1px solid ${t.divider}` : 'none' }}>
+                  <SectionTable section={tb} sectionIndex={i} onSave={handleCellSave} />
+                </div>
+              ))}
+            </div>
           </div>
-        ))}
+        )}
 
         {/* Correction log */}
         {corrections.length > 0 && (
