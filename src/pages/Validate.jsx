@@ -10,7 +10,7 @@ function MetaField({ label, value, t }) {
     <div className="p-4" style={{ borderBottom: `1px solid ${t.divider}`, borderRight: `1px solid ${t.divider}` }}>
       <div className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: t.textMuted }}>{label}</div>
       <div className="text-sm font-semibold" style={{ color: t.text }}>
-        {value || <span style={{ color: t.textMuted, fontWeight: 400 }}>—</span>}
+        {value ?? <span style={{ color: t.textMuted, fontWeight: 400 }}>—</span>}
       </div>
     </div>
   )
@@ -76,8 +76,9 @@ export default function Validate() {
     <div className="p-8 text-sm" style={{ color: '#f87171', background: t.bg }}>Rapport introuvable.</div>
   )
 
-  const meta = Array.isArray(data.meta) ? data.meta : []
-  const sections = Array.isArray(data.sections) ? data.sections : []
+  const champs = Array.isArray(data.champs) ? data.champs : []
+  const tableaux = Array.isArray(data.tableaux) ? data.tableaux : []
+  const champsIncertains = Array.isArray(data.champs_incertains) ? data.champs_incertains : []
 
   return (
     <div className="min-h-full" style={{ background: t.bg }}>
@@ -102,8 +103,8 @@ export default function Validate() {
             <div>
               <div className="text-sm font-semibold leading-tight" style={{ color: t.text }}>{report.filename}</div>
               <div className="flex items-center gap-2 text-xs mt-0.5" style={{ color: t.textMuted }}>
-                {data.document_type && (
-                  <span className="font-semibold" style={{ color: '#818cf8' }}>{data.document_type}</span>
+                {data.type_document && (
+                  <span className="font-semibold" style={{ color: '#818cf8' }}>{data.type_document}</span>
                 )}
                 <span>{new Date(report.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
                 {report.validated && corrections.length === 0 && (
@@ -157,16 +158,33 @@ export default function Validate() {
       <div className="max-w-5xl mx-auto px-8 py-7 space-y-4">
 
         {/* Meta card */}
-        {meta.length > 0 && (
+        {champs.length > 0 && (
           <div style={CARD}>
             <div className="px-5 py-4" style={{ background: 'linear-gradient(135deg, #1e2d5c 0%, #2f5496 100%)', borderBottom: `1px solid ${t.divider}` }}>
               <h2 className="text-sm font-bold text-white uppercase tracking-wider">Informations générales</h2>
-              <p className="text-xs text-blue-200 mt-0.5">{data.document_type || 'Métadonnées du procès-verbal'}{data.reference_norme ? ` — ${data.reference_norme}` : ''}</p>
+              <p className="text-xs text-blue-200 mt-0.5">{data.type_document || 'Métadonnées du procès-verbal'}</p>
             </div>
             <div className="grid grid-cols-2" style={{ background: t.card.background }}>
-              {meta.map((m, i) => (
-                <MetaField key={i} label={m.label} value={m.value} t={t} />
+              {champs.map((f, i) => (
+                <MetaField key={i} label={f.label} value={f.valeur} t={t} />
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Champs incertains */}
+        {champsIncertains.length > 0 && (
+          <div className="flex items-start gap-2.5 text-xs px-4 py-3 rounded-xl"
+            style={{ color: '#fbbf24', background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)' }}>
+            <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+              <p className="font-semibold mb-1">Lecture incertaine — à vérifier attentivement :</p>
+              <ul className="list-disc list-inside space-y-0.5">
+                {champsIncertains.map((c, i) => <li key={i}>{c}</li>)}
+              </ul>
             </div>
           </div>
         )}
@@ -181,10 +199,10 @@ export default function Validate() {
           Cliquez sur n'importe quelle cellule de donnée pour la modifier. Sauvegardez quand vous avez terminé.
         </div>
 
-        {/* Sections */}
-        {sections.map((section, i) => (
+        {/* Tableaux */}
+        {tableaux.map((tb, i) => (
           <div key={i} style={CARD}>
-            <SectionTable section={section} sectionIndex={i} onSave={handleCellSave} />
+            <SectionTable section={tb} sectionIndex={i} onSave={handleCellSave} />
           </div>
         ))}
 
