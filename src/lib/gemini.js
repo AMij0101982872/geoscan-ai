@@ -1,11 +1,14 @@
-// Les modèles 2.5 en tête : ils peuvent "réfléchir" avant de répondre, ce qui
-// change nettement la fidélité de la transcription sur les documents denses.
+// Les modèles capables de "réfléchir" avant de répondre en tête : ça change
+// nettement la fidélité de la transcription sur les documents denses.
+// gemini-3 utilise thinkingLevel (chaîne), gemini-2.5 utilise thinkingBudget
+// (nombre) — deux formats différents, non interchangeables (400 si mélangés).
 // Les modèles 2.0 (sans raisonnement) ne servent qu'en dernier recours.
 const MODELS = [
-  { name: 'gemini-2.5-flash', thinking: true },
-  { name: 'gemini-2.5-flash-lite', thinking: true },
-  { name: 'gemini-2.0-flash', thinking: false },
-  { name: 'gemini-2.0-flash-lite', thinking: false },
+  { name: 'gemini-3-flash-preview', thinkingConfig: { thinkingLevel: 'high' } },
+  { name: 'gemini-2.5-flash', thinkingConfig: { thinkingBudget: -1 } },
+  { name: 'gemini-2.5-flash-lite', thinkingConfig: { thinkingBudget: -1 } },
+  { name: 'gemini-2.0-flash', thinkingConfig: null },
+  { name: 'gemini-2.0-flash-lite', thinkingConfig: null },
 ]
 
 const PROMPT = `# SYSTÈME D'EXTRACTION DE DOCUMENTS PDF
@@ -334,9 +337,9 @@ export async function extractFromPdf(file) {
   const base64 = await fileToBase64(file)
 
   let lastError = ''
-  for (const { name: model, thinking } of MODELS) {
+  for (const { name: model, thinkingConfig } of MODELS) {
     const generationConfig = { temperature: 0.1 }
-    if (thinking) generationConfig.thinkingConfig = { thinkingBudget: -1 } // -1 = dynamique, le modèle décide combien réfléchir
+    if (thinkingConfig) generationConfig.thinkingConfig = thinkingConfig
 
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
