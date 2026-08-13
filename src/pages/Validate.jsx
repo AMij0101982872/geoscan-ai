@@ -199,20 +199,34 @@ export default function Validate() {
           Cliquez sur n'importe quelle cellule de donnée pour la modifier. Sauvegardez quand vous avez terminé.
         </div>
 
-        {/* Tableaux — un seul bloc continu (comme sur le document source),
-            les tableaux voisins sont collés, séparés par une simple ligne
-            verticale plutôt que par un espace entre deux cartes distinctes */}
-        {tableaux.length > 0 && (
-          <div style={CARD}>
-            <div className="flex flex-wrap items-stretch">
-              {tableaux.map((tb, i) => (
-                <div key={i} style={{ flex: '1 1 380px', minWidth: '320px', borderLeft: i > 0 ? `1px solid ${t.divider}` : 'none' }}>
-                  <SectionTable section={tb} sectionIndex={i} onSave={handleCellSave} />
+        {/* Tableaux — regroupés par "rangee" (position verticale sur le
+            document source) : les tableaux d'une même rangée sont collés
+            côte à côte, chaque nouvelle rangée forme un bloc en dessous,
+            pour reproduire la disposition réelle plutôt qu'une seule ligne */}
+        {tableaux.length > 0 && (() => {
+          const groups = new Map()
+          tableaux.forEach((tb, i) => {
+            const key = tb.rangee ?? 1
+            if (!groups.has(key)) groups.set(key, [])
+            groups.get(key).push({ tb, i })
+          })
+          const sortedKeys = [...groups.keys()].sort((a, b) => a - b)
+          return (
+            <div className="space-y-4">
+              {sortedKeys.map(key => (
+                <div key={key} style={CARD}>
+                  <div className="flex flex-wrap items-stretch">
+                    {groups.get(key).map(({ tb, i }, gi) => (
+                      <div key={i} style={{ flex: '1 1 380px', minWidth: '320px', borderLeft: gi > 0 ? `1px solid ${t.divider}` : 'none' }}>
+                        <SectionTable section={tb} sectionIndex={i} onSave={handleCellSave} />
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          )
+        })()}
 
         {/* Correction log */}
         {corrections.length > 0 && (

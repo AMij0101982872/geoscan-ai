@@ -51,6 +51,16 @@ const STEPS = [
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 Mo
 
+// Indice facultatif transmis au modèle pour l'orienter — jamais une
+// contrainte de structure. Les 4 catégories calibrées et validées.
+const DOC_TYPES = [
+  { value: '', label: "Laisser l'IA deviner (par défaut)" },
+  { value: "Détermination des limites d'Atterberg (ISO 17892-12)", label: "Détermination des limites d'Atterberg" },
+  { value: 'Fiche de paillasse — Distribution granulométrique / tamisage par voie humide (ISO 17892-4)', label: 'Fiche de paillasse (granulométrie / tamisage)' },
+  { value: "Minute d'essai — Extraction de bitume / analyse granulométrique (NF EN 12697)", label: "Minute d'essai (extraction de bitume)" },
+  { value: 'Fiche de paillasse — Détermination de la teneur en eau par étuvage (ISO 17892-1)', label: 'Fiche de paillasse (teneur en eau par étuvage)' },
+]
+
 export default function Upload({ session }) {
   const { isDark } = useTheme()
   const t = isDark ? T.dark : T.light
@@ -59,6 +69,7 @@ export default function Upload({ session }) {
   const [dragging, setDragging] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
+  const [docType, setDocType] = useState('')
   const inputRef = useRef()
   const navigate = useNavigate()
 
@@ -98,7 +109,7 @@ export default function Upload({ session }) {
       // Extraction directement depuis le navigateur — pas de timeout Vercel
       let raw_json
       try {
-        raw_json = await extractFromPdf(file)
+        raw_json = await extractFromPdf(file, docType || undefined)
       } catch (geminiErr) {
         await supabase.from('reports')
           .update({ status: 'error', updated_at: new Date().toISOString() })
@@ -214,6 +225,30 @@ export default function Upload({ session }) {
                 </>
               )}
             </div>
+          </div>
+
+          {/* Type de fiche (facultatif) */}
+          <div className="mx-5 mb-5">
+            <label className="block text-xs font-semibold mb-1.5" style={{ color: t.textSub }}>
+              Type de fiche (facultatif — aide l'IA à s'orienter)
+            </label>
+            <select
+              value={docType}
+              onChange={e => setDocType(e.target.value)}
+              className="w-full text-sm px-3 py-2.5 rounded-xl focus:outline-none"
+              style={{
+                background: isDark ? 'rgba(255,255,255,0.04)' : '#fafbff',
+                border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0'}`,
+                color: t.text,
+                colorScheme: isDark ? 'dark' : 'light',
+              }}
+            >
+              {DOC_TYPES.map(opt => (
+                <option key={opt.value} value={opt.value} style={{ background: isDark ? '#111827' : '#ffffff', color: isDark ? '#f8fafc' : '#111827' }}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           {/* Error */}

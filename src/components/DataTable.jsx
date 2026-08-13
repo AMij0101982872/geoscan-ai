@@ -66,6 +66,26 @@ export function SectionTable({ section, sectionIndex, onSave }) {
     ? colonnes
     : Array.from({ length: ncols }, (_, i) => `Col. ${i + 1}`)
 
+  // Bandeaux d'en-tête empilés (facultatif, cosmétique) — un ou plusieurs
+  // niveaux de regroupement de colonnes au-dessus de l'en-tête réel, comme
+  // sur le document source (ex: "CODE ECHANTILLON" puis "N° DE LA TARE").
+  // Tolère l'ancien format à plat (rapports sauvegardés avant ce changement).
+  let entetesGroupes = Array.isArray(section?.entetes_groupes) ? section.entetes_groupes : []
+  if (entetesGroupes.length > 0 && !Array.isArray(entetesGroupes[0])) entetesGroupes = [entetesGroupes]
+  const bandRuns = entetesGroupes.map(band => {
+    const groupForCol = displayColumns.map(c => band.find(g => g.colonnes.includes(c))?.label ?? null)
+    const runs = []
+    let ci = 0
+    while (ci < groupForCol.length) {
+      const label = groupForCol[ci]
+      let span = 1
+      while (ci + span < groupForCol.length && groupForCol[ci + span] === label && label !== null) span++
+      runs.push({ label, span })
+      ci += span
+    }
+    return runs
+  })
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm border-collapse">
@@ -75,6 +95,15 @@ export function SectionTable({ section, sectionIndex, onSave }) {
               {section?.titre || `Tableau ${sectionIndex + 1}`}
             </th>
           </tr>
+          {bandRuns.map((runs, bi) => (
+            <tr key={bi} style={SECTION_HEADER}>
+              {runs.map((g, i) => (
+                <th key={i} colSpan={g.span} className="px-4 py-2 text-center text-xs font-semibold text-blue-100 border-l border-white/10 first:border-l-0">
+                  {g.label || ''}
+                </th>
+              ))}
+            </tr>
+          ))}
           <tr style={COL_HEADER}>
             {displayColumns.map((c, i) => (
               <th key={i} className="text-center first:text-left px-5 py-2.5 text-xs font-semibold text-blue-100 first:w-72">{c}</th>
@@ -82,22 +111,43 @@ export function SectionTable({ section, sectionIndex, onSave }) {
           </tr>
         </thead>
         <tbody>
-          {lignes.map((ligne, ri) => (
-            <tr key={ri} className="transition-colors"
-              style={{ background: ri % 2 === 0 ? t.rowEven : t.rowOdd, borderBottom: `1px solid ${t.rowBorder}` }}
-              onMouseEnter={e => { e.currentTarget.style.background = t.rowHover }}
-              onMouseLeave={e => { e.currentTarget.style.background = ri % 2 === 0 ? t.rowEven : t.rowOdd }}>
-              {(ligne && ligne.length > 0 ? ligne : Array(ncols).fill(null)).map((v, ci) => (
-                <td key={ci} className={ci === 0 ? 'px-5 py-3' : 'px-4 py-3 text-center'}>
-                  <EditableCell
-                    value={v}
-                    fieldPath={`tableaux[${sectionIndex}].lignes[${ri}][${ci}]`}
-                    onSave={onSave}
-                  />
-                </td>
-              ))}
-            </tr>
-          ))}
+          {(() => {
+            const bandeauByRow = new Map(
+              (Array.isArray(section?.lignes_bandeau) ? section.lignes_bandeau : []).map(b => [b.ligne, b.colonnes])
+            )
+            return lignes.map((ligne, ri) => {
+            const vals = ligne && ligne.length > 0 ? ligne : Array(ncols).fill(null)
+            const span = bandeauByRow.get(ri)
+            return (
+              <tr key={ri} className="transition-colors"
+                style={{ background: ri % 2 === 0 ? t.rowEven : t.rowOdd, borderBottom: `1px solid ${t.rowBorder}` }}
+                onMouseEnter={e => { e.currentTarget.style.background = t.rowHover }}
+                onMouseLeave={e => { e.currentTarget.style.background = ri % 2 === 0 ? t.rowEven : t.rowOdd }}>
+                {span && (
+                  <td colSpan={span} className="px-5 py-3 font-semibold" style={{ color: t.text }}>
+                    <EditableCell
+                      value={vals[0]}
+                      fieldPath={`tableaux[${sectionIndex}].lignes[${ri}][0]`}
+                      onSave={onSave}
+                    />
+                  </td>
+                )}
+                {vals.slice(span || 0).map((v, i) => {
+                  const ci = (span || 0) + i
+                  return (
+                    <td key={ci} className={ci === 0 ? 'px-5 py-3' : 'px-4 py-3 text-center'}>
+                      <EditableCell
+                        value={v}
+                        fieldPath={`tableaux[${sectionIndex}].lignes[${ri}][${ci}]`}
+                        onSave={onSave}
+                      />
+                    </td>
+                  )
+                })}
+              </tr>
+            )
+          })
+          })()}
         </tbody>
       </table>
     </div>
