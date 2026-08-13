@@ -69,13 +69,23 @@ export function exportToExcel(report) {
     }
   }
 
-  // Chaque tableau garde sa propre largeur ; ils seront placés côte à côte,
-  // collés les uns aux autres (comme un seul bloc continu sur le document
-  // source), séparés uniquement par une bordure fine, pas par un espace.
-  const tableauWidths = tableaux.map(tb =>
-    Math.max((tb.colonnes || []).length, ...(tb.lignes || []).map(l => (l || []).length), 1)
+  // Chaque tableau garde sa propre largeur. "rangee" regroupe les tableaux
+  // qui sont côte à côte sur le document source (même bande horizontale) ;
+  // un tableau d'une rangée supérieure se place plus bas, sous les autres —
+  // ça reproduit la disposition réelle au lieu de tout aligner sur une seule
+  // ligne.
+  const tableauWidth = tb => Math.max((tb.colonnes || []).length, ...(tb.lignes || []).map(l => (l || []).length), 1)
+  const rangeeGroups = new Map()
+  tableaux.forEach(tb => {
+    const key = tb.rangee ?? 1
+    if (!rangeeGroups.has(key)) rangeeGroups.set(key, [])
+    rangeeGroups.get(key).push(tb)
+  })
+  const sortedRangees = [...rangeeGroups.keys()].sort((a, b) => a - b)
+  const tableauxWidth = Math.max(
+    1,
+    ...sortedRangees.map(key => rangeeGroups.get(key).reduce((sum, tb) => sum + tableauWidth(tb), 0))
   )
-  const tableauxWidth = Math.max(1, tableauWidths.reduce((sum, w) => sum + w, 0))
   // Les champs s'affichent 2 par ligne (label/valeur/label/valeur), comme
   // sur le document source — nécessite au moins 4 colonnes.
   const sheetWidth = Math.max(tableauxWidth, champs.length > 0 ? 4 : 1)
@@ -118,60 +128,108 @@ export function exportToExcel(report) {
 
   if (champs.length > 0) r++ // ligne vide
 
-  // ─── TABLEAUX (côte à côte, comme sur le document source) ──────────────
-  const tableauxStartRow = r
-  let colOffset = 1
-  let maxRowReached = r
+  // ─── TABLEAUX, une bande horizontale par rangée ─────────────────────────
+  for (const rangeeKey of sortedRangees) {
+    const group = rangeeGroups.get(rangeeKey)
+    const groupStartRow = r
+    let colOffset = 1
+    let groupMaxRow = r
 
-  tableaux.forEach((tb, ti) => {
-    const colonnes = tb.colonnes || []
-    const lignes = tb.lignes || []
-    const width = tableauWidths[ti]
-    let tr = tableauxStartRow
+    group.forEach((tb, ti) => {
+      const colonnes = tb.colonnes || []
+      const lignes = tb.lignes || []
+      const width = tableauWidth(tb)
+      let tr = groupStartRow
 
-    if (tb.titre) {
-      set(tr, colOffset, tb.titre, { bg: DARK, bold: true, halign: 'center' })
-      fillRange(tr, colOffset, colOffset + width - 1, { bg: DARK })
-      merge(tr, colOffset, tr, colOffset + width - 1)
+      if (tb.titre) {
+        set(tr, colOffset, tb.titre, { bg: DARK, bold: true, halign: 'center' })
+        fillRange(tr, colOffset, colOffset + width - 1, { bg: DARK })
+        merge(tr, colOffset, tr, colOffset + width - 1)
+        tr++
+      }
+
+      const displayColumns = colonnes.length > 0
+        ? colonnes
+        : Array.from({ length: width }, (_, i) => `Col. ${i + 1}`)
+
+      // Bandeaux d'en-tête empilés (facultatif, cosmétique) — un ou plusieurs
+      // niveaux de regroupement de colonnes chapeautant l'en-tête réel, comme
+      // "TAMIS" au-dessus de "CODE TAMIS"/"DIAMETRE (mm)", ou "CODE ECHANTILLON"
+      // puis "N° DE LA TARE" empilés au-dessus des colonnes de tare. Tolère
+      // l'ancien format à plat (rapports sauvegardés avant ce changement).
+      let bands = tb.entetes_groupes || []
+      if (bands.length > 0 && !Array.isArray(bands[0])) bands = [bands]
+      bands.forEach(band => {
+        const groupForCol = displayColumns.map(c => {
+          const g = band.find(g => g.colonnes.includes(c))
+          return g ? g.label : null
+        })
+        let ci = 0
+        while (ci < groupForCol.length) {
+          const label = groupForCol[ci]
+          let span = 1
+          while (ci + span < groupForCol.length && groupForCol[ci + span] === label && label !== null) span++
+          if (label !== null) {
+            set(tr, colOffset + ci, label, { bg: DARK, bold: true, halign: 'center' })
+            fillRange(tr, colOffset + ci, colOffset + ci + span - 1, { bg: DARK })
+            merge(tr, colOffset + ci, tr, colOffset + ci + span - 1)
+          } else {
+            set(tr, colOffset + ci, '', { bg: DARK })
+          }
+          ci += span
+        }
+        tr++
+      })
+
+      displayColumns.forEach((c, i) => set(tr, colOffset + i, c, { bg: BLUE, bold: true, halign: 'center' }))
+      fillRange(tr, colOffset, colOffset + width - 1, { bg: BLUE })
       tr++
-    }
 
-    const displayColumns = colonnes.length > 0
-      ? colonnes
-      : Array.from({ length: width }, (_, i) => `Col. ${i + 1}`)
-    displayColumns.forEach((c, i) => set(tr, colOffset + i, c, { bg: BLUE, bold: true, halign: 'center' }))
-    fillRange(tr, colOffset, colOffset + width - 1, { bg: BLUE })
-    tr++
+      const bandeauByRow = new Map((tb.lignes_bandeau || []).map(b => [b.ligne, b.colonnes]))
+      lignes.forEach((ligne, li) => {
+        const vals = ligne && ligne.length > 0 ? ligne : Array(width).fill('')
+        const span = bandeauByRow.get(li)
+        if (span) {
+          // Bandeau de séparation : fusionne exactement le nombre de colonnes
+          // indiqué (pas de couleur de remplissage, juste le texte en gras,
+          // comme sur le document source), le reste de la ligne est normal.
+          set(tr, colOffset, vals[0] ?? '', { fc: '000000', bold: true, halign: 'left' })
+          if (span > 1) merge(tr, colOffset, tr, colOffset + span - 1)
+          for (let i = span; i < vals.length; i++) {
+            set(tr, colOffset + i, vals[i] ?? '', { fc: '000000', halign: 'center' })
+          }
+        } else {
+          vals.forEach((v, i) => set(tr, colOffset + i, v ?? '', { fc: '000000', halign: i === 0 ? 'left' : 'center' }))
+        }
+        fillRange(tr, colOffset, colOffset + width - 1, { fc: '000000' })
+        tr++
+      })
 
-    lignes.forEach(ligne => {
-      const vals = ligne && ligne.length > 0 ? ligne : Array(width).fill('')
-      vals.forEach((v, i) => set(tr, colOffset + i, v ?? '', { fc: '000000', halign: i === 0 ? 'left' : 'center' }))
-      fillRange(tr, colOffset, colOffset + width - 1, { fc: '000000' })
-      tr++
+      // Bordure verticale fine entre deux tableaux voisins de la même
+      // rangée (pas de cadre individuel ni d'espace entre eux)
+      if (ti > 0) {
+        for (let rr = groupStartRow; rr < tr; rr++) {
+          const first = ws[`${col(colOffset)}${rr}`]
+          if (first) first.s.border.left = { style: 'thin', color: { rgb: '888888' } }
+        }
+      }
+
+      groupMaxRow = Math.max(groupMaxRow, tr)
+      colOffset += width
     })
 
-    // Bordure verticale fine entre deux tableaux voisins (pas de cadre
-    // individuel ni d'espace : ça doit rester un seul bloc visuel continu)
-    if (ti > 0) {
-      for (let rr = tableauxStartRow; rr < tr; rr++) {
-        const first = ws[`${col(colOffset)}${rr}`]
-        if (first) first.s.border.left = { style: 'thin', color: { rgb: '888888' } }
-      }
-    }
-
-    maxRowReached = Math.max(maxRowReached, tr)
-    colOffset += width
-  })
-
-  frame(tableauxStartRow, 1, maxRowReached - 1, tableauxWidth)
-  r = maxRowReached
+    frame(groupStartRow, 1, groupMaxRow - 1, colOffset - 1)
+    r = groupMaxRow + 1 // ligne vide entre deux rangées de tableaux
+  }
 
   // ─── PARAMÈTRES FEUILLE ─────────────────────────────────────────────
   const lastRow = Math.max(r - 1, 1)
   const finalWidth = Math.max(sheetWidth, tableauxWidth)
   ws['!ref'] = `A1:${col(finalWidth)}${lastRow}`
   ws['!merges'] = merges
-  ws['!cols'] = Array.from({ length: finalWidth }, (_, i) => ({ wch: i === 0 ? 32 : 16 }))
+  // Colonnes 1 et 3 : étiquettes des champs (2 par ligne) — texte long,
+  // besoin de largeur. Les autres restent des colonnes de valeurs/données.
+  ws['!cols'] = Array.from({ length: finalWidth }, (_, i) => ({ wch: i === 0 || i === 2 ? 30 : 16 }))
   ws['!rows'] = [{ hpt: 32 }]
 
   const wb = XLSX.utils.book_new()
