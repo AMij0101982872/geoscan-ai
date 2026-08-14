@@ -539,6 +539,23 @@ STRUCTURE CONNUE POUR CE TYPE (à titre indicatif, vérifie toujours contre le d
   avant la fin du tamis, qui continue seul jusqu'à 0,063mm).
 - "AVANT EXTRACTION" et "APRES EXTRACTION" sont des lignes de séparation à part entière,
   chacune alignée avec son propre diamètre — ne les saute jamais.`,
+
+  'Fiche de paillasse — Distribution granulométrique / tamisage par voie humide (ISO 17892-4)': `
+STRUCTURE CONNUE POUR CE TYPE (à titre indicatif, vérifie toujours contre le document réel) :
+- Le tableau a 4 colonnes de poids : "tamisage manuel 2 min", "agitateur mécanique à
+  10 min", "tamisage manuel 1 min supplémentaire", "agitateur mécanique 1 min
+  supplémentaire". Sur la plupart des lignes, SEULES 2 de ces 4 colonnes sont
+  remplies à la main (tamisage manuel 2 min, et tamisage manuel 1 min
+  supplémentaire) — les 2 colonnes "agitateur mécanique" restent VIDES (null).
+- ERREUR À NE PAS FAIRE : ne saute JAMAIS une colonne vide en décalant les valeurs
+  suivantes vers la gauche pour "combler". Si "agitateur mécanique à 10 min" est
+  vide sur cette ligne, laisse-la à null et mets la valeur suivante dans SA colonne
+  réelle ("tamisage manuel 1 min supplémentaire"), pas dans la colonne vide d'avant.
+  Vérifie chaque ligne : le nombre de valeurs non-null doit correspondre exactement
+  à ce qui est visiblement écrit, chacune sous l'en-tête directement au-dessus.
+- Le symbole "∞" (infini) est parfois écrit tel quel dans une cellule — recopie-le
+  exactement comme un seul caractère "∞", n'ajoute jamais de chiffre devant ou
+  derrière (jamais "0∞").`,
 }
 
 async function fileToBase64(file) {
