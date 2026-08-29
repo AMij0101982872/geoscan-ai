@@ -53,6 +53,14 @@ Interdictions absolues :
 # RÈGLES D'EXTRACTION
 
 * Recopie fidèlement le contenu.
+* Base-toi UNIQUEMENT sur ce qui est visuellement rendu sur la page (l'image
+  du document tel qu'un humain le verrait à l'écran ou imprimé). Certains PDF
+  contiennent du texte numérique invisible à l'affichage (reliquat d'un
+  export depuis un tableur, case masquée, texte blanc, etc.) — si une case
+  apparaît visuellement vide sur la page mais qu'une valeur "existe" ailleurs
+  dans le contenu du fichier pour cette position, IGNORE cette valeur cachée
+  et traite la case comme vide (null). N'utilise jamais une donnée que
+  l'utilisateur ne pourrait pas lui-même voir en regardant le document.
 * N'invente jamais d'information.
 * Ne corrige jamais l'orthographe.
 * Ne reformule jamais le texte.
@@ -280,6 +288,7 @@ Vérifie systématiquement les points suivants :
       "rangee": 1,
       "entetes_groupes": [[{ "label": "Groupe", "colonnes": ["Colonne A", "Colonne B"] }]],
       "lignes_bandeau": [{ "ligne": 0, "colonnes": 2 }],
+      "fusions_verticales": [{ "colonne": "Colonne A", "ligne_debut": 0, "lignes": 2 }],
       "colonnes": ["Colonne A", "Colonne B"],
       "lignes": [
         ["valeur ligne 1 colonne A", "valeur ligne 1 colonne B"],
@@ -339,6 +348,18 @@ Si une colonne n'a aucun en-tête imprimé au-dessus d'elle sur le document,
 choisis un nom de colonne simple et neutre (ex: "Description") — ne
 concatène JAMAIS plusieurs bandeaux de lignes différents pour en fabriquer un.
 
+"fusions_verticales" est aussi PUREMENT COSMÉTIQUE et optionnel : décrit une
+case qui s'étend visuellement sur PLUSIEURS LIGNES d'une même colonne (fusion
+verticale), par exemple une colonne "Référence / Code" où une seule valeur
+couvre visuellement tout un groupe de mesures + sa ligne "MOYENNE". Chaque
+entrée est \`{ "colonne": nom exact pris dans "colonnes", "ligne_debut": index
+(0 = première ligne de "lignes"), "lignes": nombre de lignes fusionnées
+verticalement à partir de "ligne_debut" }\`. Remplis quand même "lignes"
+normalement pour toutes ces lignes (la valeur de la case fusionnée peut être
+répétée ou laissée à null sur les lignes suivantes, peu importe — seul
+"ligne_debut" compte pour l'affichage). Laisse à [] s'il n'y a aucune fusion
+verticale de ce type sur le document.
+
 ---
 
 # PRIORITÉS (du plus important au moins important)
@@ -383,6 +404,17 @@ function normalizeTableaux(parsed) {
         .map(b => ({ ligne: b.ligne, colonnes: Math.min(b.colonnes, colonnes.length || b.colonnes) }))
     } else {
       t.lignes_bandeau = []
+    }
+
+    // "fusions_verticales" — même filet de sécurité : colonne existante,
+    // plage de lignes valide et bornée à la hauteur réelle du tableau.
+    if (Array.isArray(t.fusions_verticales)) {
+      t.fusions_verticales = t.fusions_verticales
+        .filter(f => f && colonnes.includes(f.colonne) && Number.isInteger(f.ligne_debut) && f.ligne_debut >= 0 &&
+          f.ligne_debut < t.lignes.length && Number.isInteger(f.lignes) && f.lignes > 1)
+        .map(f => ({ colonne: f.colonne, ligne_debut: f.ligne_debut, lignes: Math.min(f.lignes, t.lignes.length - f.ligne_debut) }))
+    } else {
+      t.fusions_verticales = []
     }
   }
 }
@@ -556,6 +588,23 @@ STRUCTURE CONNUE POUR CE TYPE (à titre indicatif, vérifie toujours contre le d
 - Le symbole "∞" (infini) est parfois écrit tel quel dans une cellule — recopie-le
   exactement comme un seul caractère "∞", n'ajoute jamais de chiffre devant ou
   derrière (jamais "0∞").`,
+
+  'Détermination de la teneur en sel chlorure (NF EN 1744-5)': `
+STRUCTURE CONNUE POUR CE TYPE (à titre indicatif, vérifie toujours contre le document réel) :
+- Le tableau est composé de GROUPES IDENTIQUES répétés (généralement 3 fois sur ce
+  document) : dans chaque groupe, EXACTEMENT 2 lignes de mesure normales, suivies
+  d'UNE ligne "MOYENNE" (bandeau fusionné sur les 5 premières colonnes, la dernière
+  colonne "Teneur en chlorure Cl-" restant à part).
+- ERREUR À NE PAS FAIRE : ne varie JAMAIS le nombre de lignes de mesure avant chaque
+  "MOYENNE" (jamais 1 ligne, jamais 3 — toujours exactement 2, même si le groupe est
+  entièrement vide). Vérifie qu'il y a bien 3 groupes de 2+1 lignes (9 lignes au
+  total dans "lignes"), pas moins.
+- La colonne "Référence / Code" est fusionnée verticalement sur les 2 lignes de
+  mesure de chaque groupe (PAS sur la ligne "MOYENNE" qui suit — la fusion
+  s'arrête juste avant). Utilise "fusions_verticales" avec 3 entrées, une par
+  groupe : \`{"colonne":"Référence / Code","ligne_debut":0,"lignes":2}\`,
+  \`{"colonne":"Référence / Code","ligne_debut":3,"lignes":2}\`,
+  \`{"colonne":"Référence / Code","ligne_debut":6,"lignes":2}\`.`,
 }
 
 async function fileToBase64(file) {
@@ -644,13 +693,10 @@ export async function extractFromPdf(file, typeHint) {
       parsed.champs_incertains = [...(parsed.champs_incertains || []), ...structureFlags]
     }
 
-    const hasData = (parsed.tableaux || []).some(
-      t => (t.lignes || []).some(ligne => (ligne || []).some(v => v !== '' && v != null))
-    )
-    if (!hasData) {
-      throw new Error("Aucune donnée exploitable trouvée dans ce document. Vérifiez qu'il s'agit bien d'un procès-verbal d'essai de laboratoire.")
-    }
-
+    // Pas de vérification "au moins une valeur non vide" ici : un gabarit
+    // vierge (rien encore rempli) est un document valide, pas une erreur.
+    // Le rejet des vrais mauvais fichiers passe uniquement par le signal
+    // explicite du modèle ci-dessus (document_non_conforme).
     return parsed
   }
 

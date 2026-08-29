@@ -186,6 +186,7 @@ export function exportToExcel(report) {
       tr++
 
       const bandeauByRow = new Map((tb.lignes_bandeau || []).map(b => [b.ligne, b.colonnes]))
+      const dataStartRow = tr
       lignes.forEach((ligne, li) => {
         const vals = ligne && ligne.length > 0 ? ligne : Array(width).fill('')
         const span = bandeauByRow.get(li)
@@ -203,6 +204,17 @@ export function exportToExcel(report) {
         }
         fillRange(tr, colOffset, colOffset + width - 1, { fc: '000000' })
         tr++
+      })
+
+      // Fusions verticales (facultatif, cosmétique) : une valeur qui s'étend
+      // visuellement sur plusieurs lignes d'une même colonne, ex: un code de
+      // référence couvrant tout un groupe de mesures + sa ligne "MOYENNE".
+      ;(tb.fusions_verticales || []).forEach(f => {
+        const ci = displayColumns.indexOf(f.colonne)
+        if (ci === -1) return
+        const r1 = dataStartRow + f.ligne_debut
+        const r2 = r1 + f.lignes - 1
+        merge(r1, colOffset + ci, r2, colOffset + ci)
       })
 
       // Bordure verticale fine entre deux tableaux voisins de la même

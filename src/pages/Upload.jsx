@@ -52,13 +52,25 @@ const STEPS = [
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 Mo
 
 // Indice facultatif transmis au modèle pour l'orienter — jamais une
-// contrainte de structure. Les 4 catégories calibrées et validées.
+// contrainte de structure. Les 4 premières catégories sont calibrées et
+// validées ; les 4 suivantes sont enregistrées (structure vérifiée sur
+// gabarit vierge) mais pas encore calibrées sur un document rempli.
 const DOC_TYPES = [
   { value: '', label: "Laisser l'IA deviner (par défaut)" },
   { value: "Détermination des limites d'Atterberg (ISO 17892-12)", label: "Détermination des limites d'Atterberg" },
   { value: 'Fiche de paillasse — Distribution granulométrique / tamisage par voie humide (ISO 17892-4)', label: 'Fiche de paillasse (granulométrie / tamisage)' },
   { value: "Minute d'essai — Extraction de bitume / analyse granulométrique (NF EN 12697)", label: "Minute d'essai (extraction de bitume)" },
   { value: 'Fiche de paillasse — Détermination de la teneur en eau par étuvage (ISO 17892-1)', label: 'Fiche de paillasse (teneur en eau par étuvage)' },
+  { value: "Essais de détermination de la teneur en oxyde de calcium CaO (mode opératoire interne)", label: 'Teneur en oxyde de calcium (CaO)' },
+  { value: 'Fiche de calcul MB — Essai au bleu de méthylène', label: 'Fiche de calcul MB (bleu de méthylène)' },
+  { value: 'Détermination de la teneur en silice SiO2', label: 'Détermination de la teneur en silice' },
+  { value: 'Détermination de la teneur en sel chlorure (NF EN 1744-5)', label: 'Détermination de la teneur en sel chlorure' },
+  { value: 'Détermination de la teneur en ciment des sols traités au ciment (NF EN 14227-15)', label: 'Teneur en ciment des sols traités' },
+  { value: 'Détermination de la porosité (mode opératoire interne)', label: 'Détermination de la porosité' },
+  { value: 'Détermination de la matière organique par méthode chimique (NF P 94-055)', label: 'Détermination de la matière organique' },
+  { value: "Analyse complète d'eau (NF EN 10 08)", label: "Analyse complète d'eau" },
+  { value: 'Détermination de la teneur en sulfate sur sols-granulats (mode opératoire interne)', label: 'Teneur en sulfate' },
+  { value: 'Essais de détermination de la teneur en magnésium (mode opératoire interne)', label: 'Teneur en magnésium' },
 ]
 
 export default function Upload({ session }) {

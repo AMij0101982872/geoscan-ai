@@ -115,6 +115,18 @@ export function SectionTable({ section, sectionIndex, onSave }) {
             const bandeauByRow = new Map(
               (Array.isArray(section?.lignes_bandeau) ? section.lignes_bandeau : []).map(b => [b.ligne, b.colonnes])
             )
+            // Fusions verticales : par colonne, quelle ligne "démarre" une
+            // fusion (avec sa hauteur) et quelles lignes sont "couvertes"
+            // (aucune cellule à rendre, déjà occupée par la fusion du dessus).
+            const fusions = Array.isArray(section?.fusions_verticales) ? section.fusions_verticales : []
+            const rowSpanStart = new Map() // `${ci}:${ri}` -> hauteur
+            const covered = new Set() // `${ci}:${ri}`
+            fusions.forEach(f => {
+              const ci = displayColumns.indexOf(f.colonne)
+              if (ci === -1) return
+              rowSpanStart.set(`${ci}:${f.ligne_debut}`, f.lignes)
+              for (let r = f.ligne_debut + 1; r < f.ligne_debut + f.lignes; r++) covered.add(`${ci}:${r}`)
+            })
             return lignes.map((ligne, ri) => {
             const vals = ligne && ligne.length > 0 ? ligne : Array(ncols).fill(null)
             const span = bandeauByRow.get(ri)
@@ -134,8 +146,10 @@ export function SectionTable({ section, sectionIndex, onSave }) {
                 )}
                 {vals.slice(span || 0).map((v, i) => {
                   const ci = (span || 0) + i
+                  if (covered.has(`${ci}:${ri}`)) return null
+                  const rowSpan = rowSpanStart.get(`${ci}:${ri}`)
                   return (
-                    <td key={ci} className={ci === 0 ? 'px-5 py-3' : 'px-4 py-3 text-center'}>
+                    <td key={ci} rowSpan={rowSpan} className={ci === 0 ? 'px-5 py-3' : 'px-4 py-3 text-center'}>
                       <EditableCell
                         value={v}
                         fieldPath={`tableaux[${sectionIndex}].lignes[${ri}][${ci}]`}
