@@ -113,7 +113,7 @@ export function SectionTable({ section, sectionIndex, onSave }) {
         <tbody>
           {(() => {
             const bandeauByRow = new Map(
-              (Array.isArray(section?.lignes_bandeau) ? section.lignes_bandeau : []).map(b => [b.ligne, b.colonnes])
+              (Array.isArray(section?.lignes_bandeau) ? section.lignes_bandeau : []).map(b => [b.ligne, { span: b.colonnes, start: b.colonne_debut || 1 }])
             )
             // Fusions verticales : par colonne, quelle ligne "démarre" une
             // fusion (avec sa hauteur) et quelles lignes sont "couvertes"
@@ -129,23 +129,38 @@ export function SectionTable({ section, sectionIndex, onSave }) {
             })
             return lignes.map((ligne, ri) => {
             const vals = ligne && ligne.length > 0 ? ligne : Array(ncols).fill(null)
-            const span = bandeauByRow.get(ri)
+            const bandeau = bandeauByRow.get(ri)
+            const leadCount = bandeau ? bandeau.start - 1 : 0
+            const afterStart = leadCount + (bandeau ? bandeau.span : 0)
             return (
               <tr key={ri} className="transition-colors"
                 style={{ background: ri % 2 === 0 ? t.rowEven : t.rowOdd, borderBottom: `1px solid ${t.rowBorder}` }}
                 onMouseEnter={e => { e.currentTarget.style.background = t.rowHover }}
                 onMouseLeave={e => { e.currentTarget.style.background = ri % 2 === 0 ? t.rowEven : t.rowOdd }}>
-                {span && (
-                  <td colSpan={span} className="px-5 py-3 font-semibold" style={{ color: t.text }}>
+                {vals.slice(0, leadCount).map((v, i) => {
+                  if (covered.has(`${i}:${ri}`)) return null
+                  const rowSpan = rowSpanStart.get(`${i}:${ri}`)
+                  return (
+                    <td key={i} rowSpan={rowSpan} className={i === 0 ? 'px-5 py-3' : 'px-4 py-3 text-center'}>
+                      <EditableCell
+                        value={v}
+                        fieldPath={`tableaux[${sectionIndex}].lignes[${ri}][${i}]`}
+                        onSave={onSave}
+                      />
+                    </td>
+                  )
+                })}
+                {bandeau && (
+                  <td colSpan={bandeau.span} className="px-5 py-3 font-semibold" style={{ color: t.text }}>
                     <EditableCell
-                      value={vals[0]}
-                      fieldPath={`tableaux[${sectionIndex}].lignes[${ri}][0]`}
+                      value={vals[leadCount]}
+                      fieldPath={`tableaux[${sectionIndex}].lignes[${ri}][${leadCount}]`}
                       onSave={onSave}
                     />
                   </td>
                 )}
-                {vals.slice(span || 0).map((v, i) => {
-                  const ci = (span || 0) + i
+                {vals.slice(afterStart).map((v, i) => {
+                  const ci = afterStart + i
                   if (covered.has(`${ci}:${ri}`)) return null
                   const rowSpan = rowSpanStart.get(`${ci}:${ri}`)
                   return (

@@ -185,18 +185,25 @@ export function exportToExcel(report) {
       fillRange(tr, colOffset, colOffset + width - 1, { bg: BLUE })
       tr++
 
-      const bandeauByRow = new Map((tb.lignes_bandeau || []).map(b => [b.ligne, b.colonnes]))
+      const bandeauByRow = new Map((tb.lignes_bandeau || []).map(b => [b.ligne, { span: b.colonnes, start: b.colonne_debut || 1 }]))
       const dataStartRow = tr
       lignes.forEach((ligne, li) => {
         const vals = ligne && ligne.length > 0 ? ligne : Array(width).fill('')
-        const span = bandeauByRow.get(li)
-        if (span) {
+        const bandeau = bandeauByRow.get(li)
+        if (bandeau) {
           // Bandeau de séparation : fusionne exactement le nombre de colonnes
-          // indiqué (pas de couleur de remplissage, juste le texte en gras,
-          // comme sur le document source), le reste de la ligne est normal.
-          set(tr, colOffset, vals[0] ?? '', { fc: '000000', bold: true, halign: 'left' })
-          if (span > 1) merge(tr, colOffset, tr, colOffset + span - 1)
-          for (let i = span; i < vals.length; i++) {
+          // indiqué, à partir de "colonne_debut" (pas de couleur de
+          // remplissage, juste le texte en gras, comme sur le document
+          // source) — les colonnes avant "colonne_debut" (ex. un identifiant
+          // qui reste séparé sur cette ligne) et après le bandeau sont
+          // rendues normalement.
+          const labelIdx = bandeau.start - 1
+          for (let i = 0; i < labelIdx; i++) {
+            set(tr, colOffset + i, vals[i] ?? '', { fc: '000000', halign: i === 0 ? 'left' : 'center' })
+          }
+          set(tr, colOffset + labelIdx, vals[labelIdx] ?? '', { fc: '000000', bold: true, halign: 'left' })
+          if (bandeau.span > 1) merge(tr, colOffset + labelIdx, tr, colOffset + labelIdx + bandeau.span - 1)
+          for (let i = labelIdx + bandeau.span; i < vals.length; i++) {
             set(tr, colOffset + i, vals[i] ?? '', { fc: '000000', halign: 'center' })
           }
         } else {
@@ -233,6 +240,26 @@ export function exportToExcel(report) {
     frame(groupStartRow, 1, groupMaxRow - 1, colOffset - 1)
     r = groupMaxRow + 1 // ligne vide entre deux rangées de tableaux
   }
+
+  // Supprime les bordures internes partagées entre les cellules d'une même
+  // fusion : chaque cellule garde par défaut sa propre bordure fine sur ses
+  // 4 côtés, donc sans ça Excel affiche un trait au milieu de la cellule
+  // "fusionnée" (ex. bas de la 1ère cellule + haut de la 2ème), qui masque
+  // visuellement la fusion même si elle est bien appliquée dans le fichier.
+  merges.forEach(m => {
+    const r1 = m.s.r + 1, c1 = m.s.c + 1, r2 = m.e.r + 1, c2 = m.e.c + 1
+    for (let rr = r1; rr <= r2; rr++) {
+      for (let cc = c1; cc <= c2; cc++) {
+        const cellObj = ws[`${col(cc)}${rr}`]
+        if (!cellObj) continue
+        const b = cellObj.s.border
+        if (rr > r1) b.top = { style: 'none' }
+        if (rr < r2) b.bottom = { style: 'none' }
+        if (cc > c1) b.left = { style: 'none' }
+        if (cc < c2) b.right = { style: 'none' }
+      }
+    }
+  })
 
   // ─── PARAMÈTRES FEUILLE ─────────────────────────────────────────────
   const lastRow = Math.max(r - 1, 1)

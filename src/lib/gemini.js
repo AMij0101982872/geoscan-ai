@@ -287,7 +287,7 @@ Vérifie systématiquement les points suivants :
       "titre": null,
       "rangee": 1,
       "entetes_groupes": [[{ "label": "Groupe", "colonnes": ["Colonne A", "Colonne B"] }]],
-      "lignes_bandeau": [{ "ligne": 0, "colonnes": 2 }],
+      "lignes_bandeau": [{ "ligne": 0, "colonnes": 2, "colonne_debut": 1 }],
       "fusions_verticales": [{ "colonne": "Colonne A", "ligne_debut": 0, "lignes": 2 }],
       "colonnes": ["Colonne A", "Colonne B"],
       "lignes": [
@@ -330,19 +330,30 @@ il ne change JAMAIS combien de lignes ou quelles valeurs vont dans
 
 "lignes_bandeau" est aussi PUREMENT COSMÉTIQUE et optionnel : décrit les
 lignes qui sont un bandeau de séparation visuel sur le document — une ligne
-où le texte de la première case s'étend visuellement sur plusieurs colonnes
-voisines (fusion), comme un sous-titre de section au milieu d'un tableau
-(ex: "AVANT EXTRACTION", "APRES EXTRACTION"). Chaque entrée est
+où le texte d'une case s'étend visuellement sur plusieurs colonnes voisines
+(fusion), comme un sous-titre de section au milieu d'un tableau (ex: "AVANT
+EXTRACTION", "APRES EXTRACTION", "MOYENNE"). Chaque entrée est
 \`{ "ligne": index (0 = première ligne de "lignes"), "colonnes": nombre de
-colonnes fusionnées en partant de la gauche }\`. Donne le vrai nombre de
-colonnes que couvre visuellement ce bandeau sur le document — ne devine
-jamais ce nombre en comptant les cases vides qui suivent, une colonne d'un
-AUTRE bloc peut aussi être vide sur cette ligne sans faire partie du bandeau.
-Remplis quand même "lignes" pour cette ligne EXACTEMENT comme n'importe
-quelle autre (même nombre de valeurs que "colonnes"). Ne fusionne jamais deux
-bandeaux différents (ex: "AVANT EXTRACTION" et "APRES EXTRACTION") en un seul
-texte — chacun reste sur sa propre ligne, avec son propre texte. Laisse à []
-s'il n'y a aucun bandeau de ce type.
+colonnes fusionnées, "colonne_debut": index 1-indexé de la colonne où
+commence la fusion }\`. "colonne_debut" vaut 1 par défaut (la fusion part de
+la première colonne) — mets une valeur plus grande UNIQUEMENT quand une ou
+plusieurs colonnes de gauche (ex. une colonne "Référence"/"Code"/identifiant)
+NE FONT VISUELLEMENT PAS partie du bandeau et doivent rester des cases à part
+sur cette ligne (regarde bien le document : si le bandeau ne touche pas le
+bord gauche du tableau, "colonne_debut" doit refléter où il commence
+réellement — ne fusionne JAMAIS une colonne d'identifiant/référence dans un
+bandeau "MOYENNE" si elle reste visuellement séparée sur le document).
+Donne le vrai nombre de colonnes que couvre visuellement ce bandeau — ne
+devine jamais ce nombre en comptant les cases vides qui suivent, une colonne
+d'un AUTRE bloc peut aussi être vide sur cette ligne sans faire partie du
+bandeau. Remplis "lignes" pour cette ligne de façon strictement POSITIONNELLE
+comme n'importe quelle autre ligne (même nombre de valeurs que "colonnes",
+une valeur par colonne réelle) : place le texte du bandeau (ex. "MOYENNE") à
+l'index correspondant à "colonne_debut" (index = colonne_debut - 1), et
+laisse null les colonnes avant lui qui restent séparées. Ne fusionne jamais
+deux bandeaux différents (ex: "AVANT EXTRACTION" et "APRES EXTRACTION") en un
+seul texte — chacun reste sur sa propre ligne, avec son propre texte. Laisse
+à [] s'il n'y a aucun bandeau de ce type.
 
 Si une colonne n'a aucun en-tête imprimé au-dessus d'elle sur le document,
 choisis un nom de colonne simple et neutre (ex: "Description") — ne
@@ -396,12 +407,17 @@ function normalizeTableaux(parsed) {
     bands = bands.filter(band => Array.isArray(band) && band.length > 0 && band.every(isValidGroup))
     t.entetes_groupes = bands
 
-    // "lignes_bandeau" — même filet de sécurité : { ligne, colonnes } valides
-    // seulement, colonnes bornées à la largeur réelle du tableau.
+    // "lignes_bandeau" — même filet de sécurité : { ligne, colonnes,
+    // colonne_debut } valides seulement, colonne_debut par défaut 1, span
+    // borné pour ne jamais dépasser la largeur réelle du tableau.
     if (Array.isArray(t.lignes_bandeau)) {
       t.lignes_bandeau = t.lignes_bandeau
         .filter(b => b && Number.isInteger(b.ligne) && b.ligne >= 0 && b.ligne < t.lignes.length && Number.isInteger(b.colonnes) && b.colonnes > 0)
-        .map(b => ({ ligne: b.ligne, colonnes: Math.min(b.colonnes, colonnes.length || b.colonnes) }))
+        .map(b => {
+          const width = colonnes.length || b.colonnes
+          const debut = Number.isInteger(b.colonne_debut) && b.colonne_debut >= 1 ? b.colonne_debut : 1
+          return { ligne: b.ligne, colonne_debut: Math.min(debut, width), colonnes: Math.min(b.colonnes, width - Math.min(debut, width) + 1) }
+        })
     } else {
       t.lignes_bandeau = []
     }
@@ -593,8 +609,16 @@ STRUCTURE CONNUE POUR CE TYPE (à titre indicatif, vérifie toujours contre le d
 STRUCTURE CONNUE POUR CE TYPE (à titre indicatif, vérifie toujours contre le document réel) :
 - Le tableau est composé de GROUPES IDENTIQUES répétés (généralement 3 fois sur ce
   document) : dans chaque groupe, EXACTEMENT 2 lignes de mesure normales, suivies
-  d'UNE ligne "MOYENNE" (bandeau fusionné sur les 5 premières colonnes, la dernière
-  colonne "Teneur en chlorure Cl-" restant à part).
+  d'UNE ligne "MOYENNE".
+- Sur la ligne "MOYENNE", la colonne "Référence / Code" (la 1ère colonne) NE FAIT
+  PAS partie du bandeau fusionné — elle reste une case à part, vide, sur cette
+  ligne (regarde le document : le bandeau "MOYENNE" ne touche pas le bord gauche
+  du tableau). Le bandeau fusionne les colonnes "Prise m (g)" à "V1" (les 4
+  colonnes centrales), la dernière colonne "Teneur en chlorure Cl-" restant elle
+  aussi à part. Utilise donc \`"lignes_bandeau": [{"ligne": <index>, "colonne_debut": 2,
+  "colonnes": 4}]\` pour chacune des 3 lignes "MOYENNE", et place le texte
+  "MOYENNE" à l'index 1 (pas 0) du tableau de valeurs de cette ligne — l'index 0
+  ("Référence / Code") reste null.
 - ERREUR À NE PAS FAIRE : ne varie JAMAIS le nombre de lignes de mesure avant chaque
   "MOYENNE" (jamais 1 ligne, jamais 3 — toujours exactement 2, même si le groupe est
   entièrement vide). Vérifie qu'il y a bien 3 groupes de 2+1 lignes (9 lignes au
