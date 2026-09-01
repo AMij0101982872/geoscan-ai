@@ -185,25 +185,36 @@ export function exportToExcel(report) {
       fillRange(tr, colOffset, colOffset + width - 1, { bg: BLUE })
       tr++
 
-      const bandeauByRow = new Map((tb.lignes_bandeau || []).map(b => [b.ligne, { span: b.colonnes, start: b.colonne_debut || 1 }]))
+      // Une ligne peut porter PLUSIEURS bandeaux indépendants (ex: deux cases
+      // "Moyenne" côte à côte dans deux mini-tableaux distincts sur la même
+      // ligne physique) — regroupées par ligne, pas une seule par ligne.
+      const bandeauxByRow = new Map()
+      ;(tb.lignes_bandeau || []).forEach(b => {
+        const list = bandeauxByRow.get(b.ligne) || []
+        list.push({ span: b.colonnes, start: b.colonne_debut || 1 })
+        bandeauxByRow.set(b.ligne, list)
+      })
       const dataStartRow = tr
       lignes.forEach((ligne, li) => {
         const vals = ligne && ligne.length > 0 ? ligne : Array(width).fill('')
-        const bandeau = bandeauByRow.get(li)
-        if (bandeau) {
-          // Bandeau de séparation : fusionne exactement le nombre de colonnes
-          // indiqué, à partir de "colonne_debut" (pas de couleur de
-          // remplissage, juste le texte en gras, comme sur le document
-          // source) — les colonnes avant "colonne_debut" (ex. un identifiant
-          // qui reste séparé sur cette ligne) et après le bandeau sont
+        const bandeaux = (bandeauxByRow.get(li) || []).slice().sort((a, b) => a.start - b.start)
+        if (bandeaux.length > 0) {
+          // Bandeaux de séparation : fusionnent exactement le nombre de
+          // colonnes indiqué, à partir de "colonne_debut" chacun (pas de
+          // couleur de remplissage, juste le texte en gras, comme sur le
+          // document source) — les colonnes avant/entre/après restent
           // rendues normalement.
-          const labelIdx = bandeau.start - 1
-          for (let i = 0; i < labelIdx; i++) {
-            set(tr, colOffset + i, vals[i] ?? '', { fc: '000000', halign: i === 0 ? 'left' : 'center' })
-          }
-          set(tr, colOffset + labelIdx, vals[labelIdx] ?? '', { fc: '000000', bold: true, halign: 'left' })
-          if (bandeau.span > 1) merge(tr, colOffset + labelIdx, tr, colOffset + labelIdx + bandeau.span - 1)
-          for (let i = labelIdx + bandeau.span; i < vals.length; i++) {
+          let cursor = 0
+          bandeaux.forEach(b => {
+            const labelIdx = b.start - 1
+            for (let i = cursor; i < labelIdx; i++) {
+              set(tr, colOffset + i, vals[i] ?? '', { fc: '000000', halign: i === 0 ? 'left' : 'center' })
+            }
+            set(tr, colOffset + labelIdx, vals[labelIdx] ?? '', { fc: '000000', bold: true, halign: 'left' })
+            if (b.span > 1) merge(tr, colOffset + labelIdx, tr, colOffset + labelIdx + b.span - 1)
+            cursor = labelIdx + b.span
+          })
+          for (let i = cursor; i < vals.length; i++) {
             set(tr, colOffset + i, vals[i] ?? '', { fc: '000000', halign: 'center' })
           }
         } else {

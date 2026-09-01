@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useTheme, T } from '../lib/theme'
@@ -57,21 +57,157 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 Mo
 // gabarit vierge) mais pas encore calibrées sur un document rempli.
 const DOC_TYPES = [
   { value: '', label: "Laisser l'IA deviner (par défaut)" },
-  { value: "Détermination des limites d'Atterberg (ISO 17892-12)", label: "Détermination des limites d'Atterberg" },
-  { value: 'Fiche de paillasse — Distribution granulométrique / tamisage par voie humide (ISO 17892-4)', label: 'Fiche de paillasse (granulométrie / tamisage)' },
-  { value: "Minute d'essai — Extraction de bitume / analyse granulométrique (NF EN 12697)", label: "Minute d'essai (extraction de bitume)" },
-  { value: 'Fiche de paillasse — Détermination de la teneur en eau par étuvage (ISO 17892-1)', label: 'Fiche de paillasse (teneur en eau par étuvage)' },
-  { value: "Essais de détermination de la teneur en oxyde de calcium CaO (mode opératoire interne)", label: 'Teneur en oxyde de calcium (CaO)' },
-  { value: 'Fiche de calcul MB — Essai au bleu de méthylène', label: 'Fiche de calcul MB (bleu de méthylène)' },
-  { value: 'Détermination de la teneur en silice SiO2', label: 'Détermination de la teneur en silice' },
-  { value: 'Détermination de la teneur en sel chlorure (NF EN 1744-5)', label: 'Détermination de la teneur en sel chlorure' },
-  { value: 'Détermination de la teneur en ciment des sols traités au ciment (NF EN 14227-15)', label: 'Teneur en ciment des sols traités' },
-  { value: 'Détermination de la porosité (mode opératoire interne)', label: 'Détermination de la porosité' },
-  { value: 'Détermination de la matière organique par méthode chimique (NF P 94-055)', label: 'Détermination de la matière organique' },
-  { value: "Analyse complète d'eau (NF EN 10 08)", label: "Analyse complète d'eau" },
-  { value: 'Détermination de la teneur en sulfate sur sols-granulats (mode opératoire interne)', label: 'Teneur en sulfate' },
-  { value: 'Essais de détermination de la teneur en magnésium (mode opératoire interne)', label: 'Teneur en magnésium' },
+  { value: "Détermination des limites d'Atterberg (ISO 17892-12)", label: "Détermination des limites d'Atterberg", category: 'Minute identification' },
+  { value: 'Fiche de paillasse — Distribution granulométrique / tamisage par voie humide (ISO 17892-4)', label: 'Fiche de paillasse (granulométrie / tamisage)', category: 'Sols & fondation' },
+  { value: "Minute d'essai — Extraction de bitume / analyse granulométrique (NF EN 12697)", label: "Minute d'essai (extraction de bitume)", category: "Minutes d'essai enrobés-sols" },
+  { value: 'Fiche de paillasse — Détermination de la teneur en eau par étuvage (ISO 17892-1)', label: 'Fiche de paillasse (teneur en eau par étuvage)', category: 'Sols & fondation' },
+  { value: "Essais de détermination de la teneur en oxyde de calcium CaO (mode opératoire interne)", label: 'Teneur en oxyde de calcium (CaO)', category: 'Chimie' },
+  { value: 'Fiche de calcul MB — Essai au bleu de méthylène', label: 'Fiche de calcul MB (bleu de méthylène)', category: 'Chimie' },
+  { value: 'Valeur au bleu de méthylène VBS (NF EN 933-9+A1)', label: 'Valeur au bleu de méthylène (VBS)', category: 'Chimie' },
+  { value: 'Détermination de la teneur en silice SiO2', label: 'Détermination de la teneur en silice', category: 'Chimie' },
+  { value: 'Détermination de la teneur en sel chlorure (NF EN 1744-5)', label: 'Détermination de la teneur en sel chlorure', category: 'Chimie' },
+  { value: 'Détermination de la teneur en ciment des sols traités au ciment (NF EN 14227-15)', label: 'Teneur en ciment des sols traités', category: 'Chimie' },
+  { value: 'Détermination de la porosité (mode opératoire interne)', label: 'Détermination de la porosité', category: 'Chimie' },
+  { value: 'Détermination de la matière organique par méthode chimique (NF P 94-055)', label: 'Détermination de la matière organique', category: 'Chimie' },
+  { value: "Analyse complète d'eau (NF EN 10 08)", label: "Analyse complète d'eau", category: 'Chimie' },
+  { value: 'Détermination de la teneur en sulfate sur sols-granulats (mode opératoire interne)', label: 'Teneur en sulfate', category: 'Chimie' },
+  { value: 'Essais de détermination de la teneur en magnésium (mode opératoire interne)', label: 'Teneur en magnésium', category: 'Chimie' },
+  { value: 'Détermination de la résistance mécanique du ciment (NF EN 196-1)', label: 'Résistance mécanique du ciment', category: 'Ciment et fer à béton' },
+  { value: 'Détermination du temps de prise et stabilité (NF EN 196-3)', label: 'Temps de prise et stabilité', category: 'Ciment et fer à béton' },
+  { value: 'Détermination de la surface spécifique (NF EN 196-6)', label: 'Détermination de la surface spécifique', category: 'Ciment et fer à béton' },
+  { value: 'Contrôle de conformité de fer à béton HA (NF A 35-080-1)', label: 'Contrôle de fer à béton (HA)', category: 'Ciment et fer à béton' },
+  { value: 'Mesure de la densité in situ (Sable/Membrane) (NF P94-061-03/NF P94-061-02)', label: 'Densité in situ (Sable/Membrane)', category: 'In situ' },
+  { value: "Minutes d'essais de plaques", label: "Essais de plaques", category: 'In situ' },
+  { value: 'Mesure de la densité apparente (NF EN 1097-3)', label: 'Densité apparente', category: 'Minute identification' },
+  { value: 'Détermination de la masse volumique réelle des granulats (NF EN 1097-6)', label: 'Masse volumique réelle des granulats', category: 'Minute identification' },
+  { value: "Minute coefficient d'aplatissement", label: "Coefficient d'aplatissement", category: 'Minute identification' },
+  { value: 'Minute analyse granulométrique granulat (NF EN 933-1)', label: 'Analyse granulométrique granulat', category: 'Minute identification' },
+  { value: 'Minute essais Los Angeles (NF EN 1097-2)', label: 'Essais Los Angeles', category: 'Minute identification' },
+  { value: "Minute indice de forme", label: 'Indice de forme', category: 'Minute identification' },
+  { value: 'Equivalent de sable (NF EN 933-8+a1)', label: 'Équivalent de sable', category: 'Minute identification' },
+  { value: "Détermination du coefficient d'absorption d'eau des granulats (NF EN 1097-6)", label: "Coefficient d'absorption d'eau des granulats", category: 'Minute identification' },
+  { value: 'Minute pierres longues (EN 13-450:2002)', label: 'Pierres longues', category: 'Minute identification' },
+  { value: "Essais d'usure Micro-Deval en présence d'eau (NF EN 1097-1)", label: 'Micro-Deval', category: 'Minute identification' },
+  { value: 'Essais Proctor normal et modifié (NF P 94-093)', label: 'Essais Proctor', category: "Minutes d'essai enrobés-sols" },
+  { value: "Détermination de la pénétrabilité à l'aiguille (NF EN 1426)", label: 'Pénétrabilité à l\'aiguille', category: "Minutes d'essai enrobés-sols" },
+  { value: 'Essais Marshall - Duriez - Hubbard Field', label: 'Marshall / Duriez / Hubbard Field', category: "Minutes d'essai enrobés-sols" },
+  { value: 'Essais CBR (NF EN 13286-47)', label: 'Essais CBR', category: "Minutes d'essai enrobés-sols" },
+  { value: 'Détermination du point de ramollissement — méthode Bille et Anneau (NF EN 1427)', label: 'Bille et Anneau', category: "Minutes d'essai enrobés-sols" },
+  { value: 'Essai de viscosité sur cut-back (NF EN 12846-2)', label: 'Viscosité sur cut-back', category: "Minutes d'essai enrobés-sols" },
+  { value: 'Densité hydrostatique sur carotte de bitume — méthode C (NF EN 12697-6)', label: 'Densité hydrostatique (méthode C)', category: "Minutes d'essai enrobés-sols" },
+  { value: "Détermination de la teneur en eau émulsion (NF EN 1428)", label: 'Teneur en eau émulsion', category: "Minutes d'essai enrobés-sols" },
+  { value: 'Fiche de paillasse — Sédimentométrie au densimètre (ISO 17892-4)', label: 'Sédimentométrie (densimètre)', category: 'Sols & fondation' },
+  { value: 'Essai oedométrique (ISO 17892-5)', label: 'Essai oedométrique', category: 'Sols & fondation' },
+  { value: 'Mesure de la teneur en eau naturelle granulat (NF EN ISO 17892-1)', label: 'Teneur en eau naturelle (granulat)', category: 'Sols & fondation' },
 ]
+
+// Options sans "category" restent à plat en tête de liste (dont le défaut) ;
+// celles avec une "category" sont regroupées sous un <optgroup>, dans l'ordre
+// de première apparition de chaque catégorie.
+const DOC_TYPES_UNGROUPED = DOC_TYPES.filter(o => !o.category)
+const DOC_TYPES_GROUPED = DOC_TYPES.reduce((groups, opt) => {
+  if (!opt.category) return groups
+  let g = groups.find(g => g.category === opt.category)
+  if (!g) { g = { category: opt.category, options: [] }; groups.push(g) }
+  g.options.push(opt)
+  return groups
+}, [])
+
+// Menu déroulant personnalisé (le <select> natif ne peut pas être stylé —
+// pas de couleurs de section, pas de survol, pas de coins arrondis dans le
+// panneau lui-même) : bouton + panneau positionné, sections avec en-tête,
+// option sélectionnée mise en avant, fermeture au clic extérieur / Échap.
+function DocTypeSelect({ value, onChange, isDark }) {
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef(null)
+  const allOptions = [...DOC_TYPES_UNGROUPED, ...DOC_TYPES_GROUPED.flatMap(g => g.options)]
+  const selected = allOptions.find(o => o.value === value) || DOC_TYPES_UNGROUPED[0]
+
+  useEffect(() => {
+    if (!open) return
+    const onPointerDown = e => { if (rootRef.current && !rootRef.current.contains(e.target)) setOpen(false) }
+    const onKeyDown = e => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('mousedown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [open])
+
+  const panelBg = isDark ? '#161f34' : '#ffffff'
+  const panelBorder = isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0'
+  const groupLabelColor = isDark ? 'rgba(129,140,248,0.85)' : '#4f6ef7'
+  const rowHover = isDark ? 'rgba(129,140,248,0.12)' : 'rgba(79,110,247,0.06)'
+  const rowSelected = isDark ? 'rgba(79,110,247,0.22)' : 'rgba(79,110,247,0.1)'
+  const dividerColor = isDark ? 'rgba(255,255,255,0.06)' : '#f1f5f9'
+
+  function Row({ opt, indent }) {
+    const isSelected = opt.value === value
+    return (
+      <button
+        type="button"
+        role="option"
+        aria-selected={isSelected}
+        onClick={() => { onChange(opt.value); setOpen(false) }}
+        className="w-full flex items-center gap-2 text-left text-sm px-3 py-2 rounded-lg transition-colors"
+        style={{
+          paddingLeft: indent ? '1.75rem' : '0.75rem',
+          color: isSelected ? '#4f6ef7' : (isDark ? '#f8fafc' : '#111827'),
+          fontWeight: isSelected ? 600 : 500,
+          background: isSelected ? rowSelected : 'transparent',
+        }}
+        onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = rowHover }}
+        onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'transparent' }}
+      >
+        <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ visibility: isSelected ? 'visible' : 'hidden' }}>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+        </svg>
+        <span className="truncate">{opt.label}</span>
+      </button>
+    )
+  }
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        className="w-full flex items-center justify-between gap-2 text-sm px-3 py-2.5 rounded-xl focus:outline-none transition-colors"
+        style={{
+          background: isDark ? 'rgba(255,255,255,0.04)' : '#fafbff',
+          border: `1px solid ${open ? '#4f6ef7' : (isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0')}`,
+          color: isDark ? '#f8fafc' : '#111827',
+        }}
+      >
+        <span className="truncate">{selected?.label}</span>
+        <svg className="w-4 h-4 flex-shrink-0 transition-transform" style={{ transform: open ? 'rotate(180deg)' : 'none', color: isDark ? 'rgba(255,255,255,0.4)' : '#94a3b8' }}
+          fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {open && (
+        <div role="listbox" className="absolute z-30 mt-1.5 w-full rounded-xl overflow-hidden"
+          style={{ background: panelBg, border: panelBorder, boxShadow: '0 12px 32px rgba(0,0,0,0.18)' }}>
+          <div className="max-h-80 overflow-y-auto p-1.5">
+            {DOC_TYPES_UNGROUPED.map(opt => <Row key={opt.value} opt={opt} />)}
+            {DOC_TYPES_GROUPED.map((g, gi) => (
+              <div key={g.category} style={gi > 0 || DOC_TYPES_UNGROUPED.length > 0 ? { borderTop: `1px solid ${dividerColor}`, marginTop: '0.375rem', paddingTop: '0.375rem' } : undefined}>
+                <div className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider" style={{ color: groupLabelColor }}>
+                  {g.category}
+                </div>
+                {g.options.map(opt => <Row key={opt.value} opt={opt} indent />)}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function Upload({ session }) {
   const { isDark } = useTheme()
@@ -244,23 +380,7 @@ export default function Upload({ session }) {
             <label className="block text-xs font-semibold mb-1.5" style={{ color: t.textSub }}>
               Type de fiche (facultatif — aide l'IA à s'orienter)
             </label>
-            <select
-              value={docType}
-              onChange={e => setDocType(e.target.value)}
-              className="w-full text-sm px-3 py-2.5 rounded-xl focus:outline-none"
-              style={{
-                background: isDark ? 'rgba(255,255,255,0.04)' : '#fafbff',
-                border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0'}`,
-                color: t.text,
-                colorScheme: isDark ? 'dark' : 'light',
-              }}
-            >
-              {DOC_TYPES.map(opt => (
-                <option key={opt.value} value={opt.value} style={{ background: isDark ? '#111827' : '#ffffff', color: isDark ? '#f8fafc' : '#111827' }}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
+            <DocTypeSelect value={docType} onChange={setDocType} isDark={isDark} />
           </div>
 
           {/* Error */}
