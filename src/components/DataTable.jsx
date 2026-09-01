@@ -112,9 +112,16 @@ export function SectionTable({ section, sectionIndex, onSave }) {
         </thead>
         <tbody>
           {(() => {
-            const bandeauByRow = new Map(
-              (Array.isArray(section?.lignes_bandeau) ? section.lignes_bandeau : []).map(b => [b.ligne, b.colonnes])
-            )
+            // Une ligne peut porter PLUSIEURS bandeaux indépendants (ex: deux
+            // cases "Moyenne" côte à côte dans deux mini-tableaux distincts
+            // sur la même ligne physique) — regroupées par ligne, pas une
+            // seule par ligne.
+            const bandeauxByRow = new Map()
+            ;(Array.isArray(section?.lignes_bandeau) ? section.lignes_bandeau : []).forEach(b => {
+              const list = bandeauxByRow.get(b.ligne) || []
+              list.push({ span: b.colonnes, start: b.colonne_debut || 1 })
+              bandeauxByRow.set(b.ligne, list)
+            })
             // Fusions verticales : par colonne, quelle ligne "démarre" une
             // fusion (avec sa hauteur) et quelles lignes sont "couvertes"
             // (aucune cellule à rendre, déjà occupée par la fusion du dessus).
@@ -129,29 +136,43 @@ export function SectionTable({ section, sectionIndex, onSave }) {
             })
             return lignes.map((ligne, ri) => {
             const vals = ligne && ligne.length > 0 ? ligne : Array(ncols).fill(null)
-            const span = bandeauByRow.get(ri)
+            const bandeaux = (bandeauxByRow.get(ri) || []).slice().sort((a, b) => a.start - b.start)
+            // Construit la liste des segments à rendre dans l'ordre des
+            // colonnes : cellules normales, entrecoupées des cases de
+            // bandeau fusionnées.
+            const segments = []
+            let cursor = 0
+            bandeaux.forEach(b => {
+              const labelIdx = b.start - 1
+              for (let i = cursor; i < labelIdx; i++) segments.push({ ci: i })
+              segments.push({ ci: labelIdx, span: b.span })
+              cursor = labelIdx + b.span
+            })
+            for (let i = cursor; i < vals.length; i++) segments.push({ ci: i })
             return (
               <tr key={ri} className="transition-colors"
                 style={{ background: ri % 2 === 0 ? t.rowEven : t.rowOdd, borderBottom: `1px solid ${t.rowBorder}` }}
                 onMouseEnter={e => { e.currentTarget.style.background = t.rowHover }}
                 onMouseLeave={e => { e.currentTarget.style.background = ri % 2 === 0 ? t.rowEven : t.rowOdd }}>
-                {span && (
-                  <td colSpan={span} className="px-5 py-3 font-semibold" style={{ color: t.text }}>
-                    <EditableCell
-                      value={vals[0]}
-                      fieldPath={`tableaux[${sectionIndex}].lignes[${ri}][0]`}
-                      onSave={onSave}
-                    />
-                  </td>
-                )}
-                {vals.slice(span || 0).map((v, i) => {
-                  const ci = (span || 0) + i
+                {segments.map(seg => {
+                  if (seg.span) {
+                    return (
+                      <td key={seg.ci} colSpan={seg.span} className="px-5 py-3 font-semibold" style={{ color: t.text }}>
+                        <EditableCell
+                          value={vals[seg.ci]}
+                          fieldPath={`tableaux[${sectionIndex}].lignes[${ri}][${seg.ci}]`}
+                          onSave={onSave}
+                        />
+                      </td>
+                    )
+                  }
+                  const ci = seg.ci
                   if (covered.has(`${ci}:${ri}`)) return null
                   const rowSpan = rowSpanStart.get(`${ci}:${ri}`)
                   return (
                     <td key={ci} rowSpan={rowSpan} className={ci === 0 ? 'px-5 py-3' : 'px-4 py-3 text-center'}>
                       <EditableCell
-                        value={v}
+                        value={vals[ci]}
                         fieldPath={`tableaux[${sectionIndex}].lignes[${ri}][${ci}]`}
                         onSave={onSave}
                       />

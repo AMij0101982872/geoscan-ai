@@ -37,7 +37,14 @@ Si le document est inexploitable (page blanche, image corrompue, contenu sans ra
 
 ### Cas n° 2 : document valide
 
-Retourne uniquement un objet JSON valide.
+Retourne uniquement UN SEUL objet JSON valide — JAMAIS un tableau JSON (\`[...]\`),
+même si le document PDF a plusieurs pages. Si le document a plusieurs pages,
+fusionne TOUJOURS leur contenu dans ce même objet unique : ajoute les tableaux
+supplémentaires dans le même "tableaux" (avec une "rangee" différente si besoin
+pour refléter leur position), et si un même tableau continue sur la page
+suivante avec les mêmes colonnes (ex: "Page 2 sur 3"), mets bout à bout toutes
+ses lignes dans UN SEUL tableau au lieu d'en créer un par page. Ne renvoie
+jamais plusieurs objets \`{type_document, champs, tableaux, ...}\` séparés.
 
 Interdictions absolues :
 
@@ -267,6 +274,11 @@ Vérifie systématiquement les points suivants :
 * chaque valeur figure une seule fois ;
 * chaque valeur se trouve sous la bonne colonne ;
 * chaque ligne contient exactement le nombre attendu de colonnes ;
+* AUCUN texte de titre de tableau, de titre de sous-section, ou de libellé de
+  groupe de colonnes (ce qui est déjà placé dans "titre", "entetes_groupes" ou
+  "lignes_bandeau") n'a été RECOPIÉ EN PLUS comme une ligne de données à part
+  dans "lignes" — chaque texte d'en-tête ou de titre n'apparaît QU'UNE SEULE
+  FOIS dans tout le JSON, jamais à la fois comme en-tête ET comme ligne ;
 * la sortie est un JSON valide.
 
 ---
@@ -287,7 +299,7 @@ Vérifie systématiquement les points suivants :
       "titre": null,
       "rangee": 1,
       "entetes_groupes": [[{ "label": "Groupe", "colonnes": ["Colonne A", "Colonne B"] }]],
-      "lignes_bandeau": [{ "ligne": 0, "colonnes": 2 }],
+      "lignes_bandeau": [{ "ligne": 0, "colonnes": 2, "colonne_debut": 1 }],
       "fusions_verticales": [{ "colonne": "Colonne A", "ligne_debut": 0, "lignes": 2 }],
       "colonnes": ["Colonne A", "Colonne B"],
       "lignes": [
@@ -330,19 +342,30 @@ il ne change JAMAIS combien de lignes ou quelles valeurs vont dans
 
 "lignes_bandeau" est aussi PUREMENT COSMÉTIQUE et optionnel : décrit les
 lignes qui sont un bandeau de séparation visuel sur le document — une ligne
-où le texte de la première case s'étend visuellement sur plusieurs colonnes
-voisines (fusion), comme un sous-titre de section au milieu d'un tableau
-(ex: "AVANT EXTRACTION", "APRES EXTRACTION"). Chaque entrée est
+où le texte d'une case s'étend visuellement sur plusieurs colonnes voisines
+(fusion), comme un sous-titre de section au milieu d'un tableau (ex: "AVANT
+EXTRACTION", "APRES EXTRACTION", "MOYENNE"). Chaque entrée est
 \`{ "ligne": index (0 = première ligne de "lignes"), "colonnes": nombre de
-colonnes fusionnées en partant de la gauche }\`. Donne le vrai nombre de
-colonnes que couvre visuellement ce bandeau sur le document — ne devine
-jamais ce nombre en comptant les cases vides qui suivent, une colonne d'un
-AUTRE bloc peut aussi être vide sur cette ligne sans faire partie du bandeau.
-Remplis quand même "lignes" pour cette ligne EXACTEMENT comme n'importe
-quelle autre (même nombre de valeurs que "colonnes"). Ne fusionne jamais deux
-bandeaux différents (ex: "AVANT EXTRACTION" et "APRES EXTRACTION") en un seul
-texte — chacun reste sur sa propre ligne, avec son propre texte. Laisse à []
-s'il n'y a aucun bandeau de ce type.
+colonnes fusionnées, "colonne_debut": index 1-indexé de la colonne où
+commence la fusion }\`. "colonne_debut" vaut 1 par défaut (la fusion part de
+la première colonne) — mets une valeur plus grande UNIQUEMENT quand une ou
+plusieurs colonnes de gauche (ex. une colonne "Référence"/"Code"/identifiant)
+NE FONT VISUELLEMENT PAS partie du bandeau et doivent rester des cases à part
+sur cette ligne (regarde bien le document : si le bandeau ne touche pas le
+bord gauche du tableau, "colonne_debut" doit refléter où il commence
+réellement — ne fusionne JAMAIS une colonne d'identifiant/référence dans un
+bandeau "MOYENNE" si elle reste visuellement séparée sur le document).
+Donne le vrai nombre de colonnes que couvre visuellement ce bandeau — ne
+devine jamais ce nombre en comptant les cases vides qui suivent, une colonne
+d'un AUTRE bloc peut aussi être vide sur cette ligne sans faire partie du
+bandeau. Remplis "lignes" pour cette ligne de façon strictement POSITIONNELLE
+comme n'importe quelle autre ligne (même nombre de valeurs que "colonnes",
+une valeur par colonne réelle) : place le texte du bandeau (ex. "MOYENNE") à
+l'index correspondant à "colonne_debut" (index = colonne_debut - 1), et
+laisse null les colonnes avant lui qui restent séparées. Ne fusionne jamais
+deux bandeaux différents (ex: "AVANT EXTRACTION" et "APRES EXTRACTION") en un
+seul texte — chacun reste sur sa propre ligne, avec son propre texte. Laisse
+à [] s'il n'y a aucun bandeau de ce type.
 
 Si une colonne n'a aucun en-tête imprimé au-dessus d'elle sur le document,
 choisis un nom de colonne simple et neutre (ex: "Description") — ne
@@ -396,12 +419,17 @@ function normalizeTableaux(parsed) {
     bands = bands.filter(band => Array.isArray(band) && band.length > 0 && band.every(isValidGroup))
     t.entetes_groupes = bands
 
-    // "lignes_bandeau" — même filet de sécurité : { ligne, colonnes } valides
-    // seulement, colonnes bornées à la largeur réelle du tableau.
+    // "lignes_bandeau" — même filet de sécurité : { ligne, colonnes,
+    // colonne_debut } valides seulement, colonne_debut par défaut 1, span
+    // borné pour ne jamais dépasser la largeur réelle du tableau.
     if (Array.isArray(t.lignes_bandeau)) {
       t.lignes_bandeau = t.lignes_bandeau
         .filter(b => b && Number.isInteger(b.ligne) && b.ligne >= 0 && b.ligne < t.lignes.length && Number.isInteger(b.colonnes) && b.colonnes > 0)
-        .map(b => ({ ligne: b.ligne, colonnes: Math.min(b.colonnes, colonnes.length || b.colonnes) }))
+        .map(b => {
+          const width = colonnes.length || b.colonnes
+          const debut = Number.isInteger(b.colonne_debut) && b.colonne_debut >= 1 ? b.colonne_debut : 1
+          return { ligne: b.ligne, colonne_debut: Math.min(debut, width), colonnes: Math.min(b.colonnes, width - Math.min(debut, width) + 1) }
+        })
     } else {
       t.lignes_bandeau = []
     }
@@ -570,7 +598,16 @@ STRUCTURE CONNUE POUR CE TYPE (à titre indicatif, vérifie toujours contre le d
   après l'item 13 n'ont plus que les colonnes tamis remplies (la liste de gauche s'arrête
   avant la fin du tamis, qui continue seul jusqu'à 0,063mm).
 - "AVANT EXTRACTION" et "APRES EXTRACTION" sont des lignes de séparation à part entière,
-  chacune alignée avec son propre diamètre — ne les saute jamais.`,
+  chacune alignée avec son propre diamètre — ne les saute jamais.
+- La 1ère colonne (les items "1) Tare (g)"..."13) Liant Interne(10/11) (%)") N'A AUCUN
+  EN-TÊTE IMPRIMÉ au-dessus d'elle sur le document — "AVANT EXTRACTION" et "APRES
+  EXTRACTION" sont des lignes de séparation DANS le tableau, pas le nom de cette
+  colonne. N'utilise JAMAIS "AVANT EXTRACTION" comme nom de la 1ère colonne (ça le
+  duplique en l'affichant à la fois comme en-tête ET comme ligne de séparation) —
+  utilise un nom neutre à la place (ex: "Désignation").
+- À droite de cette colonne d'items, il n'y a qu'UNE SEULE colonne de valeurs (celle
+  qui contient les "-" pour les items 3, 5, 7, 9, 10, 11) avant le tableau tamis —
+  n'invente jamais de colonne vide supplémentaire entre les deux.`,
 
   'Fiche de paillasse — Distribution granulométrique / tamisage par voie humide (ISO 17892-4)': `
 STRUCTURE CONNUE POUR CE TYPE (à titre indicatif, vérifie toujours contre le document réel) :
@@ -593,8 +630,16 @@ STRUCTURE CONNUE POUR CE TYPE (à titre indicatif, vérifie toujours contre le d
 STRUCTURE CONNUE POUR CE TYPE (à titre indicatif, vérifie toujours contre le document réel) :
 - Le tableau est composé de GROUPES IDENTIQUES répétés (généralement 3 fois sur ce
   document) : dans chaque groupe, EXACTEMENT 2 lignes de mesure normales, suivies
-  d'UNE ligne "MOYENNE" (bandeau fusionné sur les 5 premières colonnes, la dernière
-  colonne "Teneur en chlorure Cl-" restant à part).
+  d'UNE ligne "MOYENNE".
+- Sur la ligne "MOYENNE", la colonne "Référence / Code" (la 1ère colonne) NE FAIT
+  PAS partie du bandeau fusionné — elle reste une case à part, vide, sur cette
+  ligne (regarde le document : le bandeau "MOYENNE" ne touche pas le bord gauche
+  du tableau). Le bandeau fusionne les colonnes "Prise m (g)" à "V1" (les 4
+  colonnes centrales), la dernière colonne "Teneur en chlorure Cl-" restant elle
+  aussi à part. Utilise donc \`"lignes_bandeau": [{"ligne": <index>, "colonne_debut": 2,
+  "colonnes": 4}]\` pour chacune des 3 lignes "MOYENNE", et place le texte
+  "MOYENNE" à l'index 1 (pas 0) du tableau de valeurs de cette ligne — l'index 0
+  ("Référence / Code") reste null.
 - ERREUR À NE PAS FAIRE : ne varie JAMAIS le nombre de lignes de mesure avant chaque
   "MOYENNE" (jamais 1 ligne, jamais 3 — toujours exactement 2, même si le groupe est
   entièrement vide). Vérifie qu'il y a bien 3 groupes de 2+1 lignes (9 lignes au
@@ -605,6 +650,215 @@ STRUCTURE CONNUE POUR CE TYPE (à titre indicatif, vérifie toujours contre le d
   groupe : \`{"colonne":"Référence / Code","ligne_debut":0,"lignes":2}\`,
   \`{"colonne":"Référence / Code","ligne_debut":3,"lignes":2}\`,
   \`{"colonne":"Référence / Code","ligne_debut":6,"lignes":2}\`.`,
+
+  'Détermination de la résistance mécanique du ciment (NF EN 196-1)': `
+STRUCTURE CONNUE POUR CE TYPE (à titre indicatif, vérifie toujours contre le document réel) :
+- Le tableau principal comporte 3 groupes ("Ecrasement à 2 jours", "Ecrasement à 7 jours",
+  "Ecrasement à 28 jours"), chacun composé d'UN bandeau de titre PLEINE LARGEUR (toutes les
+  colonnes, de "N° Moule" à "Ecart (%)") suivi de SES 3 lignes de mesure (éprouvettes 1-2-3,
+  4-5-6, 7-8-9 respectivement).
+- ERREUR À NE PAS FAIRE : le bandeau de titre vient TOUJOURS AVANT ses 3 lignes de mesure sur
+  le document, jamais après. L'ordre correct dans "lignes" est donc : bandeau "Ecrasement à
+  2 jours", 3 lignes de mesure, bandeau "Ecrasement à 7 jours", 3 lignes de mesure, bandeau
+  "Ecrasement à 28 jours", 3 lignes de mesure (9 lignes de mesure + 3 bandeaux = 12 lignes au
+  total). Ne mets jamais un bandeau juste après le groupe qu'il devrait précéder.
+- Chaque bandeau fusionne TOUTES les colonnes du tableau (colonne_debut à 1, la valeur par
+  défaut) — contrairement à d'autres types de documents, ne laisse aucune colonne de gauche à
+  part pour ces bandeaux-ci, ils touchent bien le bord gauche du tableau sur ce document.`,
+
+  'Détermination du temps de prise et stabilité (NF EN 196-3)': `
+STRUCTURE CONNUE POUR CE TYPE (à titre indicatif, vérifie toujours contre le document réel) :
+- Le bloc central "Début de prise" / "Fin de prise" n'a PAS d'en-tête de colonnes imprimé :
+  représente-le comme une PAIRE de mini-tableaux côte à côte (même "rangee"), chacun à 3
+  colonnes sans nom imprimé (choisis des noms neutres, ex. "Groupe"/"Désignation"/"Valeur")
+  et 3 lignes. Tableau de gauche :
+  \`["Début de prise", "Valeur lue sur l'échelle d' (mm)", null]\`,
+  \`[null, "Heure début prise t'(h,min)", null]\`,
+  \`[null, "Temps début prise T'(h,min)", null]\`
+  — et le miroir à droite pour "Fin de prise" avec les libellés d''/t''/T''.
+- "Début de prise" et "Fin de prise" sont chacun fusionnés verticalement sur leurs 3 lignes
+  via "fusions_verticales" (ex: \`{"colonne":"Groupe","ligne_debut":0,"lignes":3}\`) — ce ne
+  sont PAS des en-têtes de groupe de colonnes ("entetes_groupes"), même si le texte apparaît
+  visuellement centré verticalement dans sa case.
+- Le tableau "Essais de stabilité" a un bandeau à 3 groupes : "Confection" (2 colonnes : Date,
+  Heure), "Après conservation" (2 colonnes : Date, Heure) puis "Ecartement (mm)" (3 colonnes :
+  "Après 24 h (A)", "après ébullition (B)", "après refroidissement (C)"). ERREUR À NE PAS
+  FAIRE : ne mets JAMAIS "Après 24 h (A)" dans le groupe "Après conservation" — elle appartient
+  au groupe "Ecartement (mm)" avec (B) et (C), pas à "Après conservation" qui ne contient que
+  Date et Heure.
+- Beaucoup de cases visiblement vides sur ce document peuvent correspondre à du texte présent
+  dans la couche invisible du PDF (valeurs fantômes) — n'extrais QUE ce qui est visuellement
+  rendu sur la page, ignore toute valeur qui n'apparaît pas visiblement dans la case.`,
+
+  'Détermination de la surface spécifique (NF EN 196-6)': `
+STRUCTURE CONNUE POUR CE TYPE (à titre indicatif, vérifie toujours contre le document réel) :
+- Le tableau "C/ Temps mesuré (s)" n'a PAS d'en-tête de colonnes imprimé : représente-le comme
+  une PAIRE de mini-tableaux côte à côte (même "rangee"), chacun à 3 colonnes sans nom imprimé
+  (noms neutres, ex. "Essai"/"Désignation"/"Valeur") et 3 lignes. Tableau de gauche :
+  \`["Essai 1", "Temps t1 (s)", null]\`, \`[null, "Temps t2 (s)", null]\`,
+  \`["Moyenne 1", null, null]\` — et le miroir à droite pour "Essai 2"/"Temps t3"/"Temps t4"/
+  "Moyenne 2".
+- "Essai 1"/"Essai 2" sont fusionnés verticalement sur leurs 2 premières lignes via
+  "fusions_verticales". La ligne "Moyenne 1"/"Moyenne 2" est un bandeau qui fusionne les 2
+  premières colonnes de son mini-tableau ("lignes_bandeau" avec colonne_debut:1, colonnes:2),
+  la case de valeur à droite restant à part.
+- Beaucoup de cases visiblement vides sur ce document peuvent correspondre à du texte présent
+  dans la couche invisible du PDF (valeurs fantômes) — n'extrais QUE ce qui est visuellement
+  rendu sur la page, ignore toute valeur qui n'apparaît pas visiblement dans la case.`,
+
+  'Contrôle de conformité de fer à béton HA (NF A 35-080-1)': `
+STRUCTURE CONNUE POUR CE TYPE (à titre indicatif, vérifie toujours contre le document réel) :
+- L'en-tête a 2 SEULS vrais groupes de colonnes : "Caractéristiques géométriques" (colonnes
+  a, h, c) et "Caractéristiques mécaniques" (colonnes ReH, Rm, Agt, Z, Rm/Reh). TOUTES les
+  autres colonnes ("Nomenclature", "CODE/ Diamètre Nominal", "Masse linéique", "Ecart à la
+  masse linéique théorique", "Observations") n'ont AUCUN sous-en-tête imprimé au-dessus
+  d'elles — elles ne doivent PAS apparaître dans "entetes_groupes".
+- ERREUR À NE PAS FAIRE : ne crée JAMAIS un groupe à une seule colonne dont le label est
+  identique au nom de la colonne elle-même (ex. un groupe "Nomenclature" contenant juste
+  "Nomenclature") — c'est interdit par la règle générale "n'invente jamais de groupe pour
+  combler une colonne", applique-la strictement ici : le seul bandeau "entetes_groupes" de ce
+  document ne doit contenir QUE les 2 groupes ci-dessus, rien d'autre.
+- La ligne "Unités" (avec "mm", "g/m", "%", "MPa"...) est une ligne de LÉGENDE statique
+  imprimée juste sous les en-têtes, à fond blanc comme les lignes de données — traite-la comme
+  la première ligne de "lignes", PAS comme un bandeau d'en-tête supplémentaire.`,
+
+  'Mesure de la densité apparente (NF EN 1097-3)': `
+STRUCTURE CONNUE POUR CE TYPE (à titre indicatif, vérifie toujours contre le document réel) :
+- Le tableau est composé de GROUPES de 3 lignes de mesure, délimités par des traits
+  horizontaux plus marqués sur le document. Compte précisément le nombre de groupes
+  visibles (regarde chaque trait de séparation) — le nombre total de lignes doit être
+  un multiple de 3 ; si ce n'est pas le cas, tu as probablement mal compté un groupe.
+- Les colonnes "CODE DE L'ECHANTILLON" et "Moyen" sont fusionnées verticalement sur
+  les 3 lignes de chaque groupe (une seule valeur visuelle pour tout le groupe).
+  Utilise "fusions_verticales" avec une entrée par groupe pour CHACUNE de ces deux
+  colonnes séparément (ex: pour un 1er groupe lignes 0-2 :
+  \`{"colonne":"CODE DE L'ECHANTILLON","ligne_debut":0,"lignes":3}\` ET
+  \`{"colonne":"Moyen","ligne_debut":0,"lignes":3}\`, puis pareil pour chaque groupe
+  suivant avec le bon "ligne_debut").`,
+
+  'Détermination de la masse volumique réelle des granulats (NF EN 1097-6)': `
+STRUCTURE CONNUE POUR CE TYPE (à titre indicatif, vérifie toujours contre le document réel) :
+- Chaque bloc "Code échantillon :" du document forme UN SEUL tableau continu de 5
+  colonnes : "Description", "Échantillon 1", "Échantillon 2", "Échantillon 3",
+  "Échantillon 4" — même si le document affiche visuellement DEUX boîtes séparées
+  côte à côte sur les mêmes lignes horizontales (une boîte de gauche avec les
+  intitulés de ligne + 2 colonnes de valeurs pour les échantillons 1 et 2, une boîte
+  de droite avec seulement 2 colonnes de valeurs SANS intitulés propres pour les
+  échantillons 3 et 4). NE CRÉE JAMAIS un second tableau séparé sans intitulés de
+  ligne pour la boîte de droite — réutilise les MÊMES intitulés de ligne que la
+  boîte de gauche ("N° du pycno", "Volume du pycno V (mL)", "Masse du pycno m1 (g)",
+  "Masse du pycno + materiau séché à l'étuve m2 (g)", "Masse du pycno + eau +
+  matériau m3 (g)", "Masse du materiau m = m2 - m1 (g)", "Temperature du liquide
+  d'essai (°C)", "Masse volumique du liquide d'essai (g/mL ou Mg/m3)") car ce sont
+  les mêmes lignes physiques, juste continuées à droite.
+- Il y a 2 blocs de ce type empilés sur le document (rangee 1 pour le premier bloc,
+  rangee 2 pour le second) — chacun garde sa propre "rangee", ne les fusionne pas
+  ensemble.`,
+
+  "Minute coefficient d'aplatissement": `
+STRUCTURE CONNUE POUR CE TYPE (à titre indicatif, vérifie toujours contre le document réel) :
+- Le tableau a 5 colonnes réelles : "Granulat élémentaire (d/D mm)", "Masse Ri du
+  granulat élémentaire (g)", "Ecartement nominal des fentes du tamis à barre (mm)",
+  "Masse mi s'écoulant à travers un tamis à barres (g)", "FIi (%)". La ligne "di/Di"
+  et les unités ("mm"/"g") imprimées sous les intitulés ne sont qu'une précision
+  d'unité, déjà incluse entre parenthèses dans le nom de colonne — n'en fais PAS un
+  second niveau d'en-tête, et ne duplique jamais un même intitulé sur 2 colonnes.
+- "Masse Ri" et "Masse mi" sont des valeurs MESURÉES (nombres décimaux type 1805.4,
+  65.7...), DIFFÉRENTES de la colonne "Ecartement nominal" qui est une valeur fixe
+  imprimée (50, 40, 31.5, 25...) — ne confonds jamais ces deux colonnes entre elles.
+  Cela dit, applique normalement la règle générale sur les valeurs cachées : si une
+  cellule de "Masse Ri"/"Masse mi" apparaît visuellement vide sur la page rendue,
+  laisse-la à null même si un total plus bas (ex. "M1 = ΣRi") semble impliquer
+  qu'elle devrait contenir une valeur — ce document est un export bureautique qui
+  peut contenir une couche de texte invisible avec des valeurs obsolètes ; ne t'en
+  sers jamais pour deviner ce qui devrait être écrit dans une case visuellement vide.
+- La dernière ligne "M1 = ΣRi" / "M2 = Σmi" contient souvent des valeurs numériques
+  réelles (totaux, résultat FI final) à ne pas ignorer quand elles sont visibles.`,
+
+  'Minute analyse granulométrique granulat (NF EN 933-1)': `
+STRUCTURE CONNUE POUR CE TYPE (à titre indicatif, vérifie toujours contre le document réel) :
+- "CODE ECHANTILLON", "Nature" et "Poids sec" sont 3 lignes D'IDENTIFICATION dans un
+  petit tableau À PART, au-dessus du tableau de tamisage (chacune avec ses propres
+  cases vides pour jusqu'à 4 échantillons). CE NE SONT PAS des groupes d'en-tête
+  ("entetes_groupes") à placer au-dessus des colonnes "R.C"/"%" du tableau principal
+  — n'invente jamais "entetes_groupes" à partir de ces libellés, laisse ce champ à
+  [] pour le tableau principal.
+- Le tableau principal a pour colonnes : "Dimension en mm", "Module", puis 4 paires
+  "R.C"/"%" (une paire par échantillon), sans aucun bandeau de regroupement visible
+  au-dessus de ces paires sur le document.`,
+
+  'Minute pierres longues (EN 13-450:2002)': `
+STRUCTURE CONNUE POUR CE TYPE (à titre indicatif, vérifie toujours contre le document réel) :
+- Le tableau n'a qu'UNE SEULE ligne de données sous l'en-tête (2 colonnes : "PRISE
+  D'ESSAI (g)", "ELEMENTS (L>=100mm)") — ne rajoute jamais de ligne vide supplémentaire
+  avant ou après, "lignes" doit contenir exactement 1 ligne.`,
+
+  "Essais d'usure Micro-Deval en présence d'eau (NF EN 1097-1)": `
+STRUCTURE CONNUE POUR CE TYPE (à titre indicatif, vérifie toujours contre le document réel) :
+- Le tableau a EXACTEMENT 3 lignes de données, une par classe imprimée dans la colonne
+  "CLASSE" : "4/6,3", "6,3/10", "10/14,0" — ne rajoute jamais de ligne vide supplémentaire
+  avant la première ou après la dernière, "lignes" doit contenir exactement ces 3 lignes.`,
+
+  'Essais Marshall - Duriez - Hubbard Field': `
+STRUCTURE CONNUE POUR CE TYPE (à titre indicatif, vérifie toujours contre le document réel) :
+- Le premier tableau ("DENSITE HYDROSTATIQUE SUR CAROTTE DE BITUME") a le mot "DURIEZ"
+  imprimé centré au-dessus, sur toute la largeur du tableau, comme un sous-titre — ce
+  N'EST PAS une valeur de donnée à placer dans une cellule, et ce N'EST PAS un bandeau
+  fusionné dans la même ligne que "Poids matériau pesé dans l'air". Mets "DURIEZ" dans
+  le champ "titre" du tableau (ex: "DENSITE HYDROSTATIQUE SUR CAROTTE DE BITUME -
+  METHODE B — DURIEZ") ou comme sa propre ligne "lignes_bandeau" pleine largeur
+  AVANT les 3 lignes de données ("Poids matériau pesé dans l'air", "hauteur de
+  l'éprouvette", "Diametre de l'éprouvette") — jamais fusionné avec elles.
+- Ce tableau et le document en général n'ont pas d'en-tête de colonnes imprimé pour les
+  colonnes de valeurs (juste des cases vides pour plusieurs éprouvettes) — utilise des
+  noms neutres (ex: "Éprouvette 1", "Éprouvette 2"...) plutôt que d'inventer un texte.`,
+
+  'Essais CBR (NF EN 13286-47)': `
+STRUCTURE CONNUE POUR CE TYPE (à titre indicatif, vérifie toujours contre le document réel) :
+- Ce document (2 pages) a 6 tableaux au total, dans cet ordre — NE SAUTE AUCUN
+  D'ENTRE EUX, notamment "2-DENSITE" qui est souvent oublié :
+  1. "1-CARACTERITIQUE DU MOULAGE" : lignes "DENSITE DE COMPACTAGE", "N° DE LA TARE",
+     "POIDS TOTAL HUMIDE", "POIDS TOTAL SEC", "POIDS DE TARE", "POIDS DE L'EAU",
+     "POIDS DE MATERIAUX SEC", "TENEUR EN EAU", "MOYENNE" (9 lignes).
+  2. "2-DENSITE" : lignes "POIDS TOTAL HUMIDE", "POIDS DU MOULE", "POIDS NET HUMIDE",
+     "VOLUME DU MOULE", "DENSITE HUMIDE", "DENSITE SECHE" (6 lignes) — ce tableau est
+     souvent oublié car il n'a pas de titre en gras aussi visible que les autres,
+     vérifie bien sa présence.
+  3. "3-MESURE DU GONFLEMENT" (JOUR/HEURE/LECTURE x3 moulages).
+  4. "ENFONCEMENT EN MM" (DEF ANNEAU/CHARGE(kg) x3 moulages).
+  5. Le petit tableau "INDICE PORTANT IP 2,50" / "IP 5,00" juste après (2 lignes x3
+     colonnes de valeurs répétées, une par moulage) — NE LE réduis PAS à un simple
+     champ scalaire dans "champs", même si les 3 valeurs sont identiques sur cet
+     exemplaire : c'est un vrai tableau à part sur le document.
+  6. "4-TENEUR EN EAU APRES ESSAI" : lignes "POIDS DE LA TARE", "POIDS TOTAL HUMIDE",
+     "POIDS TOTAL SEC", "POIDS NET DE L'EAU", "POIDS NET DU MATERIAU SEC", "SATURATION",
+     "OBSERVATION" (7 lignes).
+- ERREUR À NE PAS FAIRE, très fréquente sur ce document : dans les tableaux 1, 2 et 6,
+  la 1ère colonne (les libellés de ligne) N'A AUCUN EN-TÊTE IMPRIMÉ au-dessus d'elle —
+  ne réutilise JAMAIS le libellé de la 1ère ligne de données (ex: "DENSITE DE
+  COMPACTAGE", "POIDS DE LA TARE") comme nom de la 1ère colonne, ça le duplique en
+  l'affichant à la fois comme en-tête ET comme première ligne. Utilise un nom neutre
+  pour cette colonne (ex: "Désignation") et laisse le vrai libellé UNIQUEMENT dans sa
+  ligne de données.`,
+
+  'Essais Proctor normal et modifié (NF P 94-093)': `
+STRUCTURE CONNUE POUR CE TYPE (à titre indicatif, vérifie toujours contre le document réel) :
+- Le tableau de la 2ème page (colonnes "DUREE D'IMBIBITION", "NB DE COUPS PAR COUCHE",
+  "W% DE MOULLAGE", "W% APRES IMBIBITION", "GONFLEMENT %") a une ligne de titre au-
+  dessus, "SURCHAGE D'IMBIBITION ET DE PENETRATION" — c'est un TITRE de section (mets-
+  le dans "titre" du tableau), PAS un groupe de colonnes ("entetes_groupes") : il ne
+  correspond à aucune colonne précise, ne l'utilise jamais comme groupe.
+- "W% APRES IMBIBITION" est, lui, un VRAI groupe de colonnes à 2 sous-colonnes ("sur
+  2.5 cm Sup.", "sur Mat. Total") — c'est le SEUL bandeau de regroupement réel de ce
+  tableau, mets-le comme UN SEUL bandeau dans "entetes_groupes" (pas dans la même liste
+  que le titre de section ci-dessus).
+- ATTENTION, cette zone du document mélange texte et symboles graphiques (○, Δ, □
+  précédant les valeurs 56/25/10, avec des styles de trait différents — plein,
+  pointillé, tireté — pour distinguer 3 groupes). Vérifie soigneusement sur le document
+  réel si "96h" (ou une autre durée) s'applique à TOUTES les lignes du tableau ou
+  seulement à UN groupe précis avant de fusionner "DUREE D'IMBIBITION" verticalement —
+  ne suppose jamais une fusion sur la totalité des 9 lignes sans confirmation visuelle
+  claire, ce point est incertain et mérite double vérification.`,
 }
 
 async function fileToBase64(file) {
@@ -678,10 +932,25 @@ export async function extractFromPdf(file, typeHint) {
     const rawText = json.candidates?.[0]?.content?.parts?.[0]?.text
     if (!rawText) throw new Error('Réponse Gemini vide')
 
-    const match = rawText.match(/\{[\s\S]*\}/)
+    const match = rawText.match(/(\{[\s\S]*\}|\[[\s\S]*\])/)
     if (!match) throw new Error('Aucun JSON trouvé dans la réponse Gemini')
 
-    const parsed = JSON.parse(match[0])
+    let parsed = JSON.parse(match[0])
+
+    // Filet de sécurité : malgré la consigne d'un objet unique, le modèle
+    // renvoie parfois un tableau JSON (un objet par page) sur les documents
+    // multi-pages — fusionne en un seul document plutôt que de planter.
+    if (Array.isArray(parsed)) {
+      const pages = parsed.filter(p => p && typeof p === 'object')
+      parsed = pages.reduce((acc, page, i) => {
+        if (i === 0) return { ...page }
+        acc.champs = [...(acc.champs || []), ...(page.champs || [])]
+        acc.tableaux = [...(acc.tableaux || []), ...(page.tableaux || [])]
+        acc.champs_incertains = [...(acc.champs_incertains || []), ...(page.champs_incertains || [])]
+        return acc
+      }, {})
+    }
+
     if (parsed.error === 'document_non_conforme') {
       throw new Error("Ce document ne semble pas être un procès-verbal d'essai de laboratoire. Vérifiez le fichier et réessayez.")
     }
