@@ -38,13 +38,24 @@ Si le document est inexploitable (page blanche, image corrompue, contenu sans ra
 ### Cas n° 2 : document valide
 
 Retourne uniquement UN SEUL objet JSON valide — JAMAIS un tableau JSON (\`[...]\`),
-même si le document PDF a plusieurs pages. Si le document a plusieurs pages,
-fusionne TOUJOURS leur contenu dans ce même objet unique : ajoute les tableaux
-supplémentaires dans le même "tableaux" (avec une "rangee" différente si besoin
-pour refléter leur position), et si un même tableau continue sur la page
-suivante avec les mêmes colonnes (ex: "Page 2 sur 3"), mets bout à bout toutes
-ses lignes dans UN SEUL tableau au lieu d'en créer un par page. Ne renvoie
-jamais plusieurs objets \`{type_document, champs, tableaux, ...}\` séparés.
+même si le document PDF a plusieurs pages. Ne renvoie jamais plusieurs objets
+\`{type_document, champs, tableaux, ...}\` séparés (un par page) : quel que soit
+le nombre de pages, il n'y a toujours qu'UN SEUL objet en sortie, et tous les
+tableaux de toutes les pages vont dans le même tableau "tableaux" (avec une
+"rangee" croissante pour refléter leur ordre).
+
+Cela dit, chaque page garde normalement SES PROPRES tableaux distincts dans
+"tableaux" (un tableau par page, chacun sa "rangee", comme pour n'importe quel
+bloc encadré séparé sur une même page) — NE les fusionne PAS en un seul juste
+parce qu'ils ont les mêmes colonnes ou le même titre : deux tableaux identiques
+sur 2 pages différentes restent deux tableaux séparés, chacun avec ses propres
+lignes, sauf dans un seul cas précis : si le TABLEAU LUI-MÊME (son cadre/grille)
+est visiblement coupé en plein milieu par le saut de page — la dernière ligne
+visible en bas de la page N s'interrompt et le même quadrillage reprend en haut
+de la page N+1 sans nouveau cadre ni nouvel en-tête de colonnes, comme un
+simple débordement d'impression (ex: souvent annoté "page 2 sur 3" en haut,
+mais SANS répéter le titre du tableau) — alors seulement, mets bout à bout les
+lignes des deux pages dans UN SEUL tableau continu.
 
 Interdictions absolues :
 
@@ -720,7 +731,18 @@ STRUCTURE CONNUE POUR CE TYPE (à titre indicatif, vérifie toujours contre le d
   document ne doit contenir QUE les 2 groupes ci-dessus, rien d'autre.
 - La ligne "Unités" (avec "mm", "g/m", "%", "MPa"...) est une ligne de LÉGENDE statique
   imprimée juste sous les en-têtes, à fond blanc comme les lignes de données — traite-la comme
-  la première ligne de "lignes", PAS comme un bandeau d'en-tête supplémentaire.`,
+  la première ligne de "lignes", PAS comme un bandeau d'en-tête supplémentaire.
+- Après la ligne "Unités", les lignes de mesure sont groupées par 3 (numérotées 1, 2, 3),
+  généralement 2 groupes (6 lignes de mesure au total, donc 7 lignes dans "lignes" en comptant
+  "Unités"). Les 3 barres d'un même groupe partagent le MÊME diamètre nominal ET la MÊME
+  remarque "Observations", chacun écrit une seule fois pour tout le groupe sur le document réel
+  — si c'est le cas, fusionne les colonnes "CODE/ Diamètre Nominal" ET "Observations"
+  verticalement sur les 3 lignes de chaque groupe via "fusions_verticales", une entrée par
+  colonne par groupe (ex: \`{"colonne":"CODE/ Diamètre Nominal","ligne_debut":1,"lignes":3}\`
+  ET \`{"colonne":"Observations","ligne_debut":1,"lignes":3}\` pour le 1er groupe, pareil avec
+  \`"ligne_debut":4\` pour le 2ème — l'index 0 étant la ligne "Unités"). Vérifie quand même sur
+  le document réel si les valeurs sont bien répétées une seule fois par groupe avant d'appliquer
+  ces fusions.`,
 
   'Mesure de la densité apparente (NF EN 1097-3)': `
 STRUCTURE CONNUE POUR CE TYPE (à titre indicatif, vérifie toujours contre le document réel) :
@@ -859,6 +881,35 @@ STRUCTURE CONNUE POUR CE TYPE (à titre indicatif, vérifie toujours contre le d
   seulement à UN groupe précis avant de fusionner "DUREE D'IMBIBITION" verticalement —
   ne suppose jamais une fusion sur la totalité des 9 lignes sans confirmation visuelle
   claire, ce point est incertain et mérite double vérification.`,
+
+  'Mesure de la teneur en eau naturelle granulat (NF EN ISO 17892-1)': `
+STRUCTURE CONNUE POUR CE TYPE (à titre indicatif, vérifie toujours contre le document réel) :
+- Le document répète le même bloc de 9 lignes (CODE DE L'ECHANTILLON, N° de la tare, Poids
+  total humide, Poids total sec, Poids de la tare, Poids de l'eau, Poids du matériau sec,
+  Teneur en eau en %, Moyenne teneur en eau en %) plusieurs fois de suite (généralement 3
+  fois), SANS aucun en-tête de colonnes imprimé nulle part sur le document.
+- ERREUR À NE PAS FAIRE : ne crée JAMAIS un "tableau" séparé (une nouvelle "rangee") par
+  répétition de ce bloc de 9 lignes. Les répétitions se suivent directement sur le même
+  quadrillage continu, SANS en-tête entre elles — c'est donc UN SEUL tableau (une seule
+  "rangee", un seul jeu de "colonnes"), avec toutes les répétitions mises bout à bout dans
+  "lignes" (27 lignes au total pour 3 répétitions). N'invente JAMAIS un en-tête de colonnes
+  répété pour chaque bloc — l'en-tête (nécessairement un nom neutre, ex: "1"/"2"/"3", puisqu'il
+  n'y a rien d'imprimé) n'apparaît qu'une seule fois pour tout le tableau.
+- "CODE DE L'ECHANTILLON" ET "Moyenne teneur en eau en %" sont TOUTES LES DEUX fusionnées de
+  la MÊME MANIÈRE, PAR PAIRE de colonnes (colonnes 1-2 fusionnées ensemble, colonnes 3-4
+  fusionnées ensemble séparément — DEUX fusions distinctes sur chacune de ces deux lignes,
+  jamais une seule fusion continue sur toute la largeur, jamais zéro) : chaque paire
+  d'échantillons partage un même code ET sa propre moyenne. Utilise DEUX entrées
+  "lignes_bandeau" pour CHACUNE de ces deux lignes (ex pour "CODE DE L'ECHANTILLON" à la ligne
+  0 : \`{"ligne":0,"colonne_debut":2,"colonnes":2}\` ET \`{"ligne":0,"colonne_debut":4,
+  "colonnes":2}\` ; exactement pareil pour "Moyenne" à la ligne 8 : \`{"ligne":8,
+  "colonne_debut":2,"colonnes":2}\` ET \`{"ligne":8,"colonne_debut":4,"colonnes":2}\`).
+  N'utilise JAMAIS une seule fusion continue sur toute la largeur pour "Moyenne" — c'est une
+  erreur fréquente sur ce document, vérifie bien qu'elle a exactement DEUX entrées
+  "lignes_bandeau" par répétition, comme "CODE DE L'ECHANTILLON".
+- Deux entrées "lignes_bandeau" par répétition pour CHACUNE des deux lignes "CODE DE
+  L'ECHANTILLON" (lignes 0, 9, 18) et "Moyenne teneur en eau en %" (lignes 8, 17, 26) pour 3
+  répétitions de 9 lignes chacune — soit 4 entrées "lignes_bandeau" au total par répétition.`,
 }
 
 async function fileToBase64(file) {
