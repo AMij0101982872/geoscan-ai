@@ -6,13 +6,13 @@ const BLUE = '2F5496'
 
 const col = n => String.fromCharCode(64 + n) // 1→A, 7→G
 
-function cell(value, { bg, fc = 'FFFFFF', bold = false, halign = 'left', sz = 10 } = {}) {
+function cell(value, { bg, fc = 'FFFFFF', bold = false, halign = 'left', sz = 10, wrap = false } = {}) {
   const v = value ?? ''
   const t = typeof v === 'number' ? 'n' : 's'
   const borderColor = bg ? 'FFFFFF' : 'CCCCCC'
   const style = {
     font: { name: 'Calibri', sz, bold, color: { rgb: fc } },
-    alignment: { horizontal: halign, vertical: 'center', wrapText: false },
+    alignment: { horizontal: halign, vertical: 'center', wrapText: wrap },
     border: {
       top: { style: 'thin', color: { rgb: borderColor } },
       bottom: { style: 'thin', color: { rgb: borderColor } },
@@ -34,6 +34,10 @@ export function exportToExcel(report) {
 
   const ws = {}
   const merges = []
+  // Lignes d'en-tête (bandeaux de groupe + ligne de noms de colonnes) : texte
+  // souvent long, retour à la ligne activé pour elles — on leur donne une
+  // hauteur plus généreuse pour laisser la place à 2-3 lignes.
+  const headerRows = new Set()
 
   function set(r, c, value, style = {}) {
     ws[`${col(c)}${r}`] = cell(value, style)
@@ -142,9 +146,19 @@ export function exportToExcel(report) {
       let tr = groupStartRow
 
       if (tb.titre) {
+        // "titre_norme" (facultatif) : référence de norme affichée dans sa
+        // PROPRE cellule à droite du titre, comme sur le document source
+        // (deux cases distinctes sur la même ligne) — plutôt que noyée dans
+        // le texte du titre lui-même.
+        const hasNorme = !!tb.titre_norme && width > 1
+        const titreSpan = hasNorme ? width - 1 : width
         set(tr, colOffset, tb.titre, { bg: DARK, bold: true, halign: 'center' })
-        fillRange(tr, colOffset, colOffset + width - 1, { bg: DARK })
-        merge(tr, colOffset, tr, colOffset + width - 1)
+        fillRange(tr, colOffset, colOffset + titreSpan - 1, { bg: DARK })
+        merge(tr, colOffset, tr, colOffset + titreSpan - 1)
+        if (hasNorme) {
+          set(tr, colOffset + titreSpan, tb.titre_norme, { bg: DARK, bold: true, halign: 'center' })
+          if (width - titreSpan > 1) merge(tr, colOffset + titreSpan, tr, colOffset + width - 1)
+        }
         tr++
       }
 
@@ -160,9 +174,18 @@ export function exportToExcel(report) {
       let bands = tb.entetes_groupes || []
       if (bands.length > 0 && !Array.isArray(bands[0])) bands = [bands]
       bands.forEach(band => {
-        const groupForCol = displayColumns.map(c => {
-          const g = band.find(g => g.colonnes.includes(c))
-          return g ? g.label : null
+        // Associe chaque colonne à son groupe par POSITION, pas par nom : deux
+        // colonnes peuvent légitimement porter le même nom sous des groupes
+        // différents (ex: "A l'air"/"A l'eau" répétées sous "POIDS AVANT
+        // MISE" puis "POIDS APRES MISE") — un simple .find() par nom
+        // associerait à tort les deux occurrences au premier groupe trouvé.
+        const groupForCol = new Array(displayColumns.length).fill(null)
+        const claimed = new Array(displayColumns.length).fill(false)
+        band.forEach(g => {
+          g.colonnes.forEach(name => {
+            const idx = displayColumns.findIndex((c, i) => c === name && !claimed[i])
+            if (idx !== -1) { groupForCol[idx] = g.label; claimed[idx] = true }
+          })
         })
         let ci = 0
         while (ci < groupForCol.length) {
@@ -170,7 +193,7 @@ export function exportToExcel(report) {
           let span = 1
           while (ci + span < groupForCol.length && groupForCol[ci + span] === label && label !== null) span++
           if (label !== null) {
-            set(tr, colOffset + ci, label, { bg: DARK, bold: true, halign: 'center' })
+            set(tr, colOffset + ci, label, { bg: DARK, bold: true, halign: 'center', wrap: true })
             fillRange(tr, colOffset + ci, colOffset + ci + span - 1, { bg: DARK })
             merge(tr, colOffset + ci, tr, colOffset + ci + span - 1)
           } else {
@@ -178,11 +201,13 @@ export function exportToExcel(report) {
           }
           ci += span
         }
+        headerRows.add(tr)
         tr++
       })
 
-      displayColumns.forEach((c, i) => set(tr, colOffset + i, c, { bg: BLUE, bold: true, halign: 'center' }))
+      displayColumns.forEach((c, i) => set(tr, colOffset + i, c, { bg: BLUE, bold: true, halign: 'center', wrap: true }))
       fillRange(tr, colOffset, colOffset + width - 1, { bg: BLUE })
+      headerRows.add(tr)
       tr++
 
       // Une ligne peut porter PLUSIEURS bandeaux indépendants (ex: deux cases
@@ -279,8 +304,13 @@ export function exportToExcel(report) {
   ws['!merges'] = merges
   // Colonnes 1 et 3 : étiquettes des champs (2 par ligne) — texte long,
   // besoin de largeur. Les autres restent des colonnes de valeurs/données.
-  ws['!cols'] = Array.from({ length: finalWidth }, (_, i) => ({ wch: i === 0 || i === 2 ? 30 : 16 }))
-  ws['!rows'] = [{ hpt: 32 }]
+  ws['!cols'] = Array.from({ length: finalWidth }, (_, i) => ({ wch: i === 0 || i === 2 ? 30 : 20 }))
+  // Ligne de titre plus haute ; lignes d'en-tête de tableau (bandeaux de
+  // groupe + noms de colonnes) plus hautes aussi pour laisser le texte
+  // (souvent long) s'enrouler sur plusieurs lignes au lieu d'être tronqué.
+  const rows = [{ hpt: 32 }]
+  headerRows.forEach(rowNum => { rows[rowNum - 1] = { hpt: 45 } })
+  ws['!rows'] = rows
 
   const wb = XLSX.utils.book_new()
   const sheetName = (d?.type_document || 'Rapport').slice(0, 31)
