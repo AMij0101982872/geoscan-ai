@@ -73,7 +73,19 @@ export function SectionTable({ section, sectionIndex, onSave }) {
   let entetesGroupes = Array.isArray(section?.entetes_groupes) ? section.entetes_groupes : []
   if (entetesGroupes.length > 0 && !Array.isArray(entetesGroupes[0])) entetesGroupes = [entetesGroupes]
   const bandRuns = entetesGroupes.map(band => {
-    const groupForCol = displayColumns.map(c => band.find(g => g.colonnes.includes(c))?.label ?? null)
+    // Associe chaque colonne à son groupe par POSITION, pas par nom : deux
+    // colonnes peuvent légitimement porter le même nom sous des groupes
+    // différents (ex: "A l'air"/"A l'eau" répétées sous "POIDS AVANT MISE"
+    // puis "POIDS APRES MISE") — un simple .find() par nom associerait à
+    // tort les deux occurrences au premier groupe trouvé.
+    const groupForCol = new Array(displayColumns.length).fill(null)
+    const claimed = new Array(displayColumns.length).fill(false)
+    band.forEach(g => {
+      g.colonnes.forEach(name => {
+        const idx = displayColumns.findIndex((c, i) => c === name && !claimed[i])
+        if (idx !== -1) { groupForCol[idx] = g.label; claimed[idx] = true }
+      })
+    })
     const runs = []
     let ci = 0
     while (ci < groupForCol.length) {
@@ -91,9 +103,20 @@ export function SectionTable({ section, sectionIndex, onSave }) {
       <table className="w-full text-sm border-collapse">
         <thead>
           <tr>
-            <th colSpan={ncols} className="px-5 py-3 text-left text-xs font-bold text-white uppercase tracking-wider" style={SECTION_HEADER}>
-              {section?.titre || `Tableau ${sectionIndex + 1}`}
-            </th>
+            {section?.titre_norme && ncols > 1 ? (
+              <>
+                <th colSpan={ncols - 1} className="px-5 py-3 text-left text-xs font-bold text-white uppercase tracking-wider" style={SECTION_HEADER}>
+                  {section.titre || `Tableau ${sectionIndex + 1}`}
+                </th>
+                <th className="px-5 py-3 text-center text-xs font-bold text-white uppercase tracking-wider border-l border-white/10" style={SECTION_HEADER}>
+                  {section.titre_norme}
+                </th>
+              </>
+            ) : (
+              <th colSpan={ncols} className="px-5 py-3 text-left text-xs font-bold text-white uppercase tracking-wider" style={SECTION_HEADER}>
+                {section?.titre || `Tableau ${sectionIndex + 1}`}
+              </th>
+            )}
           </tr>
           {bandRuns.map((runs, bi) => (
             <tr key={bi} style={SECTION_HEADER}>

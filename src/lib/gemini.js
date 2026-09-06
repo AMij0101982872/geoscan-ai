@@ -308,6 +308,7 @@ Vérifie systématiquement les points suivants :
   "tableaux": [
     {
       "titre": null,
+      "titre_norme": null,
       "rangee": 1,
       "entetes_groupes": [[{ "label": "Groupe", "colonnes": ["Colonne A", "Colonne B"] }]],
       "lignes_bandeau": [{ "ligne": 0, "colonnes": 2, "colonne_debut": 1 }],
@@ -322,6 +323,14 @@ Vérifie systématiquement les points suivants :
   "champs_incertains": []
 }
 \`\`\`
+
+"titre_norme" est PUREMENT COSMÉTIQUE et optionnel : certains tableaux ont, sur la MÊME ligne
+que leur titre, une référence de norme affichée dans SA PROPRE case séparée à droite (deux
+cases distinctes visibles sur le document, pas juste du texte entre parenthèses collé au
+titre). Dans ce cas précis, mets le titre dans "titre" et la référence dans "titre_norme" —
+ils s'afficheront chacun dans leur propre cellule. Si la référence de norme n'a PAS sa propre
+case visible sur le document (ex: elle est juste écrite à la suite du titre dans la même case,
+ou il n'y a pas de référence du tout), laisse "titre_norme" à null.
 
 "rangee" (entier, à partir de 1) indique la position verticale du tableau sur
 la page : deux tableaux avec la même "rangee" sont placés côte à côte sur le
@@ -833,15 +842,49 @@ STRUCTURE CONNUE POUR CE TYPE (à titre indicatif, vérifie toujours contre le d
   l'éprouvette", "Diametre de l'éprouvette") — jamais fusionné avec elles.
 - Ce tableau et le document en général n'ont pas d'en-tête de colonnes imprimé pour les
   colonnes de valeurs (juste des cases vides pour plusieurs éprouvettes) — utilise des
-  noms neutres (ex: "Éprouvette 1", "Éprouvette 2"...) plutôt que d'inventer un texte.`,
+  noms neutres (ex: "Éprouvette 1", "Éprouvette 2"...) plutôt que d'inventer un texte.
+- ERREUR TRÈS FRÉQUENTE sur ce document, LIS ATTENTIVEMENT : chacun des titres "ESSAI HUBBARD
+  FIELD", "ESSAI MARSHALL", "ESSAI DURIEZ" ET le 1er tableau ("DENSITE HYDROSTATIQUE...") a sa
+  RÉFÉRENCE DE NORME imprimée à côté de lui, sur la MÊME ligne mais dans SA PROPRE case
+  séparée (deux cases bien distinctes visibles sur le document, PAS du texte entre
+  parenthèses collé au titre). Utilise EXACTEMENT ces 4 paires "titre"/"titre_norme" (copie-les
+  telles quelles, seul le texte peut varier légèrement selon ce que tu lis) :
+  \`{"titre":"DENSITE HYDROSTATIQUE SUR CAROTTE DE BITUME - METHODE B — DURIEZ",
+  "titre_norme":"NF EN 12697-6"}\`,
+  \`{"titre":"ESSAI HUBBARD FIELD","titre_norme":"NF P 98-251-3"}\`,
+  \`{"titre":"ESSAI MARSHALL","titre_norme":"NF EN 12697-34"}\`,
+  \`{"titre":"ESSAI DURIEZ","titre_norme":"NF EN 12697-12"}\`.
+  N'écris JAMAIS la référence de norme À LA SUITE du texte de "titre" (ni entre parenthèses,
+  ni avec un tiret) — le champ "titre_norme" DOIT être rempli séparément à chaque fois, il ne
+  doit JAMAIS rester absent ou vide sur ce document : les 4 tableaux ont chacun leur référence.
+- Pour "ESSAI HUBBARD FIELD" et "ESSAI DURIEZ", les 2 groupes "POIDS AVANT MISE" et "POIDS
+  APRES MISE" ont chacun 2 sous-colonnes "A l'air" / "A l'eau" — le nom de CHAQUE sous-colonne
+  est UNIQUEMENT "A l'air" ou "A l'eau", ne répète JAMAIS le nom du groupe parent dedans (ex:
+  jamais "POIDS AVANT MISE A l'air" comme nom de colonne — le nom du groupe va uniquement dans
+  "entetes_groupes", pas dans "colonnes").`,
 
   'Essais CBR (NF EN 13286-47)': `
 STRUCTURE CONNUE POUR CE TYPE (à titre indicatif, vérifie toujours contre le document réel) :
 - Ce document (2 pages) a 6 tableaux au total, dans cet ordre — NE SAUTE AUCUN
   D'ENTRE EUX, notamment "2-DENSITE" qui est souvent oublié :
-  1. "1-CARACTERITIQUE DU MOULAGE" : lignes "DENSITE DE COMPACTAGE", "N° DE LA TARE",
-     "POIDS TOTAL HUMIDE", "POIDS TOTAL SEC", "POIDS DE TARE", "POIDS DE L'EAU",
-     "POIDS DE MATERIAUX SEC", "TENEUR EN EAU", "MOYENNE" (9 lignes).
+  1. "1-CARACTERITIQUE DU MOULAGE" : la 1ère colonne a pour EN-TÊTE RÉEL IMPRIMÉ
+     "DENSITE DE COMPACTAGE" (ce n'est PAS une ligne de données ni un nom neutre à
+     inventer — c'est le texte exact du document, à mettre dans "colonnes", PAS dans
+     "lignes"). Les 8 lignes de données sont : "N° DE LA TARE", "POIDS TOTAL HUMIDE",
+     "POIDS TOTAL SEC", "POIDS DE TARE", "POIDS DE L'EAU", "POIDS DE MATERIAUX SEC",
+     "TENEUR EN EAU", "MOYENNE".
+     ERREUR À NE PAS FAIRE : chaque moulage ("56 coups"/"25 coups"/"14 coups") a en
+     réalité 2 colonnes de valeurs (2 tares testées par moulage), donc 6 colonnes de
+     valeurs au total — PAS 3. Seule la dernière ligne "MOYENNE" a UNE SEULE valeur par
+     moulage, fusionnée sur les 2 colonnes de ce moulage — utilise "lignes_bandeau" avec
+     3 entrées (une par moulage), à l'index de la ligne "MOYENNE" (7, la dernière ligne) :
+     \`{"ligne":7,"colonne_debut":2,"colonnes":2}\`, \`{"ligne":7,"colonne_debut":4,
+     "colonnes":2}\`, \`{"ligne":7,"colonne_debut":6,"colonnes":2}\`. Les 7 autres lignes
+     ("N° DE LA TARE" à "TENEUR EN EAU") gardent leurs 6 colonnes séparées normalement.
+     "colonnes" doit donc avoir 7 entrées au total : \`["DENSITE DE COMPACTAGE","MOULAGE
+     A (56 coups)","MOULAGE A (56 coups)","MOULAGE A (25 coups)","MOULAGE A (25 coups)",
+     "MOULAGE A (14 coups)","MOULAGE A (14 coups)"]\` (le nom se répète pour les 2
+     colonnes d'un même moulage, c'est normal et volontaire).
   2. "2-DENSITE" : lignes "POIDS TOTAL HUMIDE", "POIDS DU MOULE", "POIDS NET HUMIDE",
      "VOLUME DU MOULE", "DENSITE HUMIDE", "DENSITE SECHE" (6 lignes) — ce tableau est
      souvent oublié car il n'a pas de titre en gras aussi visible que les autres,
@@ -855,13 +898,13 @@ STRUCTURE CONNUE POUR CE TYPE (à titre indicatif, vérifie toujours contre le d
   6. "4-TENEUR EN EAU APRES ESSAI" : lignes "POIDS DE LA TARE", "POIDS TOTAL HUMIDE",
      "POIDS TOTAL SEC", "POIDS NET DE L'EAU", "POIDS NET DU MATERIAU SEC", "SATURATION",
      "OBSERVATION" (7 lignes).
-- ERREUR À NE PAS FAIRE, très fréquente sur ce document : dans les tableaux 1, 2 et 6,
-  la 1ère colonne (les libellés de ligne) N'A AUCUN EN-TÊTE IMPRIMÉ au-dessus d'elle —
-  ne réutilise JAMAIS le libellé de la 1ère ligne de données (ex: "DENSITE DE
-  COMPACTAGE", "POIDS DE LA TARE") comme nom de la 1ère colonne, ça le duplique en
-  l'affichant à la fois comme en-tête ET comme première ligne. Utilise un nom neutre
-  pour cette colonne (ex: "Désignation") et laisse le vrai libellé UNIQUEMENT dans sa
-  ligne de données.`,
+- ERREUR À NE PAS FAIRE, très fréquente sur ce document : dans les tableaux 2 et 6
+  (PAS le tableau 1, voir ci-dessus — son en-tête "DENSITE DE COMPACTAGE" EST réel et
+  imprimé), la 1ère colonne (les libellés de ligne) N'A AUCUN EN-TÊTE IMPRIMÉ au-dessus
+  d'elle — ne réutilise JAMAIS le libellé de la 1ère ligne de données (ex: "POIDS DE LA
+  TARE") comme nom de la 1ère colonne, ça le duplique en l'affichant à la fois comme
+  en-tête ET comme première ligne. Utilise un nom neutre pour cette colonne (ex:
+  "Désignation") et laisse le vrai libellé UNIQUEMENT dans sa ligne de données.`,
 
   'Essais Proctor normal et modifié (NF P 94-093)': `
 STRUCTURE CONNUE POUR CE TYPE (à titre indicatif, vérifie toujours contre le document réel) :
@@ -880,7 +923,13 @@ STRUCTURE CONNUE POUR CE TYPE (à titre indicatif, vérifie toujours contre le d
   réel si "96h" (ou une autre durée) s'applique à TOUTES les lignes du tableau ou
   seulement à UN groupe précis avant de fusionner "DUREE D'IMBIBITION" verticalement —
   ne suppose jamais une fusion sur la totalité des 9 lignes sans confirmation visuelle
-  claire, ce point est incertain et mérite double vérification.`,
+  claire, ce point est incertain et mérite double vérification.
+- Le grand tableau de la 1ère page (colonnes "N°", "Poids total humide", "Poids total sec",
+  "Poids de la tare"..."Eau de moule" en lignes) n'a AUCUN en-tête de colonnes imprimé pour
+  les colonnes de valeurs — ERREUR À NE PAS FAIRE : ne laisse JAMAIS "colonnes" avec des
+  chaînes vides ("") pour ces colonnes. Utilise un nom neutre pour la 1ère colonne (ex:
+  "Désignation") et des numéros pour les colonnes de valeurs (ex: "1", "2", "3"...) — jamais
+  de chaîne vide.`,
 
   'Mesure de la teneur en eau naturelle granulat (NF EN ISO 17892-1)': `
 STRUCTURE CONNUE POUR CE TYPE (à titre indicatif, vérifie toujours contre le document réel) :
@@ -910,6 +959,37 @@ STRUCTURE CONNUE POUR CE TYPE (à titre indicatif, vérifie toujours contre le d
 - Deux entrées "lignes_bandeau" par répétition pour CHACUNE des deux lignes "CODE DE
   L'ECHANTILLON" (lignes 0, 9, 18) et "Moyenne teneur en eau en %" (lignes 8, 17, 26) pour 3
   répétitions de 9 lignes chacune — soit 4 entrées "lignes_bandeau" au total par répétition.`,
+
+  "Minute indice de forme": `
+STRUCTURE CONNUE POUR CE TYPE (à titre indicatif, vérifie toujours contre le document réel) —
+LIS CETTE SECTION TRÈS ATTENTIVEMENT, c'est un piège récurrent sur ce document précis :
+
+Le tableau a EXACTEMENT ces 5 colonnes, DANS CET ORDRE :
+1. "Granulat élémentaire di/Di mm"
+2. "Masse Mi1 du granulat élémentaire di/Di g"
+3. "Pourcentage Vi de di/Di (%)"
+4. "Masse Mi2 des éléments dont le rapport Longueur/Epaisseur > 3 g"
+5. "Indice de forme = (Mi2/Mi1) x 100"
+
+"entetes_groupes" doit être EXACTEMENT (copie cette structure telle quelle, seul l'orthographe
+exacte des noms de colonnes peut varier légèrement selon ce que tu lis sur le document) :
+\`\`\`json
+"entetes_groupes": [[
+  { "label": "Tamisage sur tamis d'essai", "colonnes": ["Granulat élémentaire di/Di mm", "Masse Mi1 du granulat élémentaire di/Di g"] },
+  { "label": "Tamisage sur tamis à barre", "colonnes": ["Masse Mi2 des éléments dont le rapport Longueur/Epaisseur > 3 g", "Indice de forme = (Mi2/Mi1) x 100"] }
+]]
+\`\`\`
+Explication : "Pourcentage Vi de di/Di (%)" (colonne 3, celle du MILIEU) est un résultat
+CALCULÉ qui n'appartient à AUCUNE des deux méthodes de tamisage — la case du bandeau
+directement au-dessus d'elle est VIDE sur le document (ni "Tamisage sur tamis d'essai" ni
+"Tamisage sur tamis à barre" ne s'étend jusqu'à elle). C'est pour ça que "Tamisage sur tamis
+d'essai" s'arrête à la colonne 2 (PAS la colonne 3), et que "Tamisage sur tamis à barre"
+commence à la colonne 4 (PAS la colonne 3).
+ERREURS DÉJÀ OBSERVÉES À NE PAS REFAIRE : (a) ne laisse jamais "entetes_groupes" à [] — les
+deux bandeaux sont bien imprimés sur le document, ne les oublie pas ; (b) n'oublie jamais
+"Granulat élémentaire di/Di mm" (colonne 1) dans le groupe "Tamisage sur tamis d'essai" ; (c)
+n'ajoute jamais "Pourcentage Vi de di/Di (%)" à aucun des deux groupes, ni au premier ni au
+second.`,
 }
 
 async function fileToBase64(file) {
